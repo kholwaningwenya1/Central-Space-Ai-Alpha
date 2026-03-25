@@ -1,0 +1,8 @@
+{
+  "name": "Central Space AI",
+  "description": "An all-in-one workspace assistant for research, document creation, coding, data analysis, and media generation.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ]
+}

@@ -1,0 +1,211 @@
+{
+  "entities": {
+    "Session": {
+      "title": "Session",
+      "description": "A workspace session containing chat messages and other data.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique session ID" },
+        "title": { "type": "string", "description": "Session title" },
+        "type": { "type": "string", "enum": ["direct", "group", "channel", "workspace"], "description": "Type of conversation" },
+        "members": { "type": "array", "items": { "type": "string" }, "description": "List of user IDs who are members of this session" },
+        "messages": { "type": "array", "items": { "$ref": "Message" }, "description": "List of messages in the session" },
+        "tone": { "type": "string", "description": "AI response tone" },
+        "voice": { "type": "string", "description": "AI response voice" },
+        "modelId": { "type": "string", "description": "AI model ID" },
+        "searchEnabled": { "type": "boolean", "description": "Whether web search is enabled" },
+        "privacyMode": { "type": "boolean", "description": "Whether privacy mode is enabled" },
+        "isFavorite": { "type": "boolean", "description": "Whether session is favorited" },
+        "mode": { "type": "string", "enum": ["chat", "canvas", "library", "units", "document", "directory", "bots", "media"], "description": "Current mode of the session" },
+        "canvasData": { "type": "object", "description": "Data for the visual canvas mode" },
+        "documentData": { "type": "string", "description": "Content for the document editor mode" },
+        "documentVersions": { "type": "array", "items": { "$ref": "DocumentVersion" }, "description": "List of document versions" },
+        "files": { "type": "array", "items": { "$ref": "FileData" }, "description": "List of files in the session library" },
+        "agentUnits": { "type": "array", "items": { "$ref": "Bot" }, "description": "List of bots active in the session" },
+        "updatedAt": { "type": "integer", "description": "Last updated timestamp" },
+        "uid": { "type": "string", "description": "Creator user ID" },
+        "description": { "type": "string", "description": "Session description" },
+        "avatar": { "type": "string", "description": "Session avatar URL or emoji" }
+      },
+      "required": ["id", "title", "messages", "uid", "mode", "updatedAt", "members", "type"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A single message in a session.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "assistant", "system", "bot"] },
+        "content": { "type": "string" },
+        "timestamp": { "type": "integer" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderAvatar": { "type": "string" },
+        "poll": { "$ref": "Poll" },
+        "reactions": { "type": "array", "items": { "$ref": "Reaction" } }
+      },
+      "required": ["id", "role", "content", "timestamp"]
+    },
+    "FileData": {
+      "title": "FileData",
+      "description": "Metadata for a file in the library.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "data": { "type": "string" },
+        "size": { "type": "integer" },
+        "timestamp": { "type": "integer" }
+      },
+      "required": ["id", "name", "type", "data", "size", "timestamp"]
+    },
+    "Bot": {
+      "title": "Bot",
+      "description": "An AI bot configuration.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "username": { "type": "string" },
+        "description": { "type": "string" },
+        "systemInstruction": { "type": "string" },
+        "commands": { "type": "array", "items": { "type": "object" } },
+        "tools": { "type": "array", "items": { "type": "string" } },
+        "webhookUrl": { "type": "string" },
+        "avatar": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "integer" }
+      },
+      "required": ["id", "name", "username", "systemInstruction", "creatorId", "isActive", "createdAt"]
+    },
+    "Poll": {
+      "title": "Poll",
+      "description": "A poll in a message.",
+      "type": "object",
+      "properties": {
+        "question": { "type": "string" },
+        "options": { "type": "array", "items": { "type": "object" } },
+        "isMultipleChoice": { "type": "boolean" },
+        "isAnonymous": { "type": "boolean" }
+      },
+      "required": ["question", "options", "isMultipleChoice", "isAnonymous"]
+    },
+    "Reaction": {
+      "title": "Reaction",
+      "description": "A reaction to a message.",
+      "type": "object",
+      "properties": {
+        "emoji": { "type": "string" },
+        "uids": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["emoji", "uids"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "An in-app notification for a user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "success", "warning", "error", "collaborator", "bot"] },
+        "link": { "type": "string" },
+        "isRead": { "type": "boolean" },
+        "timestamp": { "type": "integer" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["id", "userId", "title", "message", "type", "isRead", "timestamp"]
+    },
+    "DocumentVersion": {
+      "title": "DocumentVersion",
+      "description": "A version of a document.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "integer" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" }
+      },
+      "required": ["id", "content", "timestamp", "authorId", "authorName"]
+    },
+    "DocumentTemplate": {
+      "title": "DocumentTemplate",
+      "description": "A reusable document template.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string", "enum": ["report", "meeting", "research", "other"] },
+        "creatorId": { "type": "string" },
+        "createdAt": { "type": "integer" }
+      },
+      "required": ["id", "title", "content", "category", "creatorId", "createdAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile and role data.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["super_admin", "admin", "support", "user"] },
+        "plan": { "type": "string", "enum": ["free", "standard", "advanced", "corporate"] },
+        "isWhitelisted": { "type": "boolean" },
+        "createdAt": { "type": "integer" },
+        "updatedAt": { "type": "integer" }
+      },
+      "required": ["uid", "email", "role", "plan", "createdAt", "updatedAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "A payment transaction.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "completed", "failed"] },
+        "plan": { "type": "string" },
+        "paypalOrderId": { "type": "string" },
+        "systemFee": { "type": "number" },
+        "timestamp": { "type": "integer" }
+      },
+      "required": ["id", "userId", "amount", "currency", "status", "plan", "paypalOrderId", "systemFee", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/sessions/{sessionId}": {
+      "schema": "Session",
+      "description": "Workspace sessions and chat history."
+    },
+    "/bots/{botId}": {
+      "schema": "Bot",
+      "description": "Custom AI bots created by users."
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile and role data."
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notifications for events and alerts."
+    },
+    "/templates/{templateId}": {
+      "schema": "DocumentTemplate",
+      "description": "Custom document templates."
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Payment transactions for subscriptions."
+    }
+  }
+}

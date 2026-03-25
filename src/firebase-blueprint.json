@@ -1,0 +1,116 @@
+{
+  "entities": {
+    "FileData": {
+      "title": "FileData",
+      "description": "Metadata for a file uploaded to the workspace.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "data": { "type": "string" },
+        "size": { "type": "number" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "name", "type", "data", "size", "timestamp"]
+    },
+    "AgentUnit": {
+      "title": "AgentUnit",
+      "description": "A specialized AI unit configured with n8n.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "n8nWebhookUrl": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "icon": { "type": "string" }
+      },
+      "required": ["id", "name", "description", "isActive", "icon"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A single message in a chat session.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "assistant"] },
+        "content": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "files": {
+          "type": "array",
+          "items": { "$ref": "FileData" }
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "uri": { "type": "string" },
+              "title": { "type": "string" },
+              "type": { "type": "string", "enum": ["web", "maps"] }
+            }
+          }
+        },
+        "translation": {
+          "type": "object",
+          "properties": {
+            "language": { "type": "string" },
+            "content": { "type": "string" }
+          }
+        },
+        "agentDiscussion": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "unitName": { "type": "string" },
+              "thought": { "type": "string" },
+              "action": { "type": "string" }
+            }
+          }
+        }
+      },
+      "required": ["id", "role", "content", "timestamp"]
+    },
+    "WorkspaceSession": {
+      "title": "WorkspaceSession",
+      "description": "A collection of messages and settings for a specific workspace.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "messages": {
+          "type": "array",
+          "items": { "$ref": "Message" }
+        },
+        "tone": { "type": "string" },
+        "voice": { "type": "string" },
+        "modelId": { "type": "string" },
+        "searchEnabled": { "type": "boolean" },
+        "privacyMode": { "type": "boolean" },
+        "mode": { "type": "string", "enum": ["chat", "canvas", "library", "settings", "units"] },
+        "canvasData": { "type": "object" },
+        "files": {
+          "type": "array",
+          "items": { "$ref": "FileData" }
+        },
+        "agentUnits": {
+          "type": "array",
+          "items": { "$ref": "AgentUnit" }
+        },
+        "updatedAt": { "type": "number" },
+        "uid": { "type": "string" }
+      },
+      "required": ["id", "title", "messages", "uid", "mode", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/sessions/{sessionId}": {
+      "schema": "WorkspaceSession",
+      "description": "User workspace sessions."
+    }
+  }
+}
