@@ -122,38 +122,38 @@ export function Units({ units, onUpdate }: UnitsProps) {
         {isAdding && (
           <div className="bg-white border border-zinc-200 rounded-3xl p-6 shadow-sm space-y-4 animate-in fade-in slide-in-from-top-4">
             <h3 className="text-sm font-semibold text-zinc-900">New Agentic Unit</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Unit Name</label>
-                    <input
-                      type="text"
-                      value={newUnit.name}
-                      onChange={e => setNewUnit({ ...newUnit, name: e.target.value })}
-                      placeholder="e.g., Research Bot"
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Username</label>
-                    <input
-                      type="text"
-                      value={newUnit.username}
-                      onChange={e => setNewUnit({ ...newUnit, username: e.target.value })}
-                      placeholder="@research_bot"
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Webhook URL (Optional)</label>
-                  <input
-                    type="text"
-                    value={newUnit.webhookUrl}
-                    onChange={e => setNewUnit({ ...newUnit, webhookUrl: e.target.value })}
-                    placeholder="https://yourdomain.com/webhook/..."
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
-                  />
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Unit Name</label>
+                <input
+                  type="text"
+                  value={newUnit.name}
+                  onChange={e => setNewUnit({ ...newUnit, name: e.target.value })}
+                  placeholder="e.g., Research Bot"
+                  className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Username</label>
+                <input
+                  type="text"
+                  value={newUnit.username}
+                  onChange={e => setNewUnit({ ...newUnit, username: e.target.value })}
+                  placeholder="@research_bot"
+                  className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Webhook URL (Optional)</label>
+              <input
+                type="text"
+                value={newUnit.webhookUrl}
+                onChange={e => setNewUnit({ ...newUnit, webhookUrl: e.target.value })}
+                placeholder="https://yourdomain.com/webhook/..."
+                className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
+              />
+            </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Description & Role</label>
               <textarea

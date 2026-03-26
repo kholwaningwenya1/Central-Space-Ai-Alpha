@@ -1,15 +1,24 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Message } from '../types';
+import { Message, ConversationType } from '../types';
 import { cn } from '../lib/utils';
-import { User, Bot as BotIcon, Copy, Check, FileText, ExternalLink, Download, FileSpreadsheet, Volume2, Image as ImageIcon, Video, MapPin, Languages, Loader2, Cpu, Sparkles, Share2, Smile, BarChart2, Trash2, Pencil, Youtube, Headphones } from 'lucide-react';
+import { User, Bot as BotIcon, Copy, Check, FileText, ExternalLink, Download, FileSpreadsheet, Volume2, Image as ImageIcon, Video, MapPin, Languages, Loader2, Cpu, Sparkles, Share2, Smile, BarChart2, Trash2, Pencil, Youtube, Headphones, FileArchive } from 'lucide-react';
 import { useState } from 'react';
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'motion/react';
+import { format, isToday, isYesterday } from 'date-fns';
+
+const formatMessageTime = (timestamp: number) => {
+  const date = new Date(timestamp);
+  if (isToday(date)) return format(date, 'h:mm a');
+  if (isYesterday(date)) return 'Yesterday';
+  return format(date, 'MMM d');
+};
 
 interface MessageBubbleProps {
   message: Message;
+  conversationType?: ConversationType;
   onGenerateImage?: (prompt: string) => void;
   onGenerateVideo?: (prompt: string) => void;
   onTranslate?: (text: string, lang: string) => Promise<void>;
@@ -20,9 +29,12 @@ interface MessageBubbleProps {
   onFindYouTubeLinks?: (topic: string) => void;
   onGenerateSpeech?: (text: string) => void;
   currentUserId?: string;
+  onExportAudio?: (text: string) => void;
+  onExportImageSketch?: (text: string) => void;
+  onExportZip?: (text: string) => void;
 }
 
-export function MessageBubble({ message, onGenerateImage, onGenerateVideo, onTranslate, onReact, onVote, onDelete, onEdit, onFindYouTubeLinks, onGenerateSpeech, currentUserId }: MessageBubbleProps) {
+export function MessageBubble({ message, conversationType = 'workspace', onGenerateImage, onGenerateVideo, onTranslate, onReact, onVote, onDelete, onEdit, onFindYouTubeLinks, onGenerateSpeech, currentUserId, onExportAudio, onExportImageSketch, onExportZip }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
@@ -126,6 +138,158 @@ export function MessageBubble({ message, onGenerateImage, onGenerateVideo, onTra
     setIsEditing(false);
   };
 
+  if (conversationType === 'direct' || conversationType === 'group' || conversationType === 'channel') {
+    const isMe = message.senderId === currentUserId || (!message.senderId && !isAssistant && !isBot);
+    const directEmojis = ['😂', '😢', '😊', '👍', '🙏', '⚡', '❌'];
+    const workEmojis = ['👍', '✅', '❓', '🚀', '📌'];
+    const emojisToUse = conversationType === 'direct' ? directEmojis : workEmojis;
+
+    return (
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={cn("flex w-full mb-6 px-4 font-sans", isMe ? "justify-start" : "justify-end")}
+      >
+        <div className={cn("flex max-w-[85%] md:max-w-[70%] gap-3", isMe ? "flex-row" : "flex-row-reverse")}>
+          <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm overflow-hidden bg-white border border-zinc-200">
+            {isAssistant ? (
+              <BotIcon className="w-5 h-5 text-zinc-900" />
+            ) : isBot ? (
+              message.senderPhoto ? (
+                <img src={message.senderPhoto} alt={message.senderName} className="w-full h-full object-cover" />
+              ) : (
+                <BotIcon className="w-5 h-5 text-zinc-900" />
+              )
+            ) : message.senderPhoto ? (
+              <img src={message.senderPhoto} alt={message.senderName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              <User className="w-5 h-5 text-zinc-400" />
+            )}
+          </div>
+          
+          <div className="flex flex-col gap-1 relative group">
+            <div className={cn(
+              "p-3 md:p-4 rounded-2xl relative shadow-sm",
+              isMe ? "bg-zinc-100 text-zinc-900 rounded-tl-sm" : "bg-blue-500 text-white rounded-tr-sm"
+            )}>
+              {/* Message Content */}
+              <div className={cn(
+                "prose prose-sm max-w-none mb-2",
+                isMe ? "prose-zinc" : "prose-invert"
+              )}>
+                {isEditing ? (
+                  <div className="flex flex-col gap-2">
+                    <textarea
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      className="w-full bg-white/50 border border-zinc-200/50 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 text-zinc-900"
+                      rows={3}
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => setIsEditing(false)} className="text-xs px-2 py-1 rounded hover:bg-black/10">Cancel</button>
+                      <button onClick={handleEdit} className="text-xs px-2 py-1 bg-zinc-900 text-white rounded hover:bg-zinc-800">Save</button>
+                    </div>
+                  </div>
+                ) : (
+                  <ReactMarkdown>{message.content}</ReactMarkdown>
+                )}
+              </div>
+
+              {/* Timestamp */}
+              <div 
+                className={cn(
+                  "text-[10px] text-right italic mt-1",
+                  isMe ? "text-zinc-500" : "text-blue-100"
+                )}
+                aria-label={`Sent at ${formatMessageTime(message.timestamp)}`}
+              >
+                {formatMessageTime(message.timestamp)}
+              </div>
+
+              {/* Hover Actions */}
+              <div className={cn(
+                "absolute top-0 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-white border border-zinc-200 shadow-sm rounded-full p-1 z-10",
+                isMe ? "right-0 translate-x-1/2" : "left-0 -translate-x-1/2"
+              )}>
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                    className="p-1.5 rounded-full text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
+                  >
+                    <Smile className="w-3.5 h-3.5" />
+                  </button>
+                  <AnimatePresence>
+                    {showEmojiPicker && (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className={cn(
+                          "absolute top-full mt-2 bg-white border border-zinc-200 shadow-xl rounded-xl p-2 flex gap-1 z-50",
+                          isMe ? "right-0" : "left-0"
+                        )}
+                      >
+                        {emojisToUse.map(emoji => (
+                          <button
+                            key={emoji}
+                            onClick={() => {
+                              onReact?.(emoji);
+                              setShowEmojiPicker(false);
+                            }}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-zinc-100 rounded-lg transition-colors text-lg"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+                {isMe && (
+                  <>
+                    <button onClick={() => setIsEditing(!isEditing)} className="p-1.5 rounded-full text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition-colors">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={onDelete} className="p-1.5 rounded-full text-zinc-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Reactions Display */}
+            {message.reactions && message.reactions.length > 0 && (
+              <div className={cn("flex flex-wrap gap-1 mt-1", isMe ? "justify-start" : "justify-end")}>
+                <AnimatePresence>
+                  {message.reactions.map((reaction, i) => {
+                    const hasReacted = currentUserId && reaction.uids.includes(currentUserId);
+                    return (
+                      <motion.button
+                        key={`${reaction.emoji}-${i}`}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        onClick={() => onReact?.(reaction.emoji)}
+                        className={cn(
+                          "px-2 py-0.5 border rounded-full text-xs shadow-sm flex items-center gap-1 transition-colors",
+                          hasReacted ? "bg-blue-50 border-blue-200" : "bg-white border-zinc-200 hover:bg-zinc-50"
+                        )}
+                      >
+                        <span>{reaction.emoji}</span>
+                        <span className={cn("font-medium", hasReacted ? "text-blue-600" : "text-zinc-500")}>{reaction.uids.length}</span>
+                      </motion.button>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
@@ -164,6 +328,12 @@ export function MessageBubble({ message, onGenerateImage, onGenerateVideo, onTra
           <div className="flex items-center gap-3">
             <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
               {isAssistant ? "Central Space AI" : isBot ? (message.senderName || "Bot") : (message.senderName || "User Session")}
+            </span>
+            <span 
+              className="text-[10px] text-zinc-400 italic"
+              aria-label={`Sent at ${formatMessageTime(message.timestamp)}`}
+            >
+              {formatMessageTime(message.timestamp)}
             </span>
             {isAssistant && (
               <span className="px-2 py-0.5 bg-zinc-100 text-zinc-500 text-[9px] font-bold uppercase tracking-wider rounded-md">
@@ -274,6 +444,27 @@ export function MessageBubble({ message, onGenerateImage, onGenerateVideo, onTra
                   >
                     <ImageIcon className="w-4 h-4" />
                   </button>
+                )}
+                {conversationType === 'workspace' && (
+                  <div className="relative group/export">
+                    <button className="p-2 rounded-lg text-zinc-400 hover:text-zinc-950 hover:bg-zinc-50 transition-all flex items-center gap-1" title="Export Options">
+                      <Download className="w-4 h-4" />
+                    </button>
+                    <div className="absolute bottom-full right-0 mb-2 w-48 bg-white border border-zinc-200 shadow-xl rounded-xl p-2 opacity-0 invisible group-hover/export:opacity-100 group-hover/export:visible transition-all z-50">
+                      <button onClick={() => onExportAudio?.(message.content)} className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 rounded-lg flex items-center gap-2">
+                        <Headphones className="w-3.5 h-3.5" /> Voice Note (WAV)
+                      </button>
+                      <button onClick={() => onExportAudio?.(message.content)} className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 rounded-lg flex items-center gap-2">
+                        <Volume2 className="w-3.5 h-3.5" /> Audio File (MP3)
+                      </button>
+                      <button onClick={() => onExportImageSketch?.(message.content)} className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 rounded-lg flex items-center gap-2">
+                        <ImageIcon className="w-3.5 h-3.5" /> Image Sketch
+                      </button>
+                      <button onClick={() => onExportZip?.(message.content)} className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 rounded-lg flex items-center gap-2">
+                        <FileArchive className="w-3.5 h-3.5" /> All (ZIP)
+                      </button>
+                    </div>
+                  </div>
                 )}
                 <button 
                   onClick={copyToClipboard}
@@ -444,21 +635,26 @@ export function MessageBubble({ message, onGenerateImage, onGenerateVideo, onTra
         {/* Reactions Display */}
         {message.reactions && message.reactions.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-4">
-            {message.reactions.map((r, idx) => (
-              <button
-                key={idx}
-                onClick={() => onReact?.(r.emoji)}
-                className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all border",
-                  r.uids.includes(currentUserId || '') 
-                    ? "bg-zinc-950 text-white border-zinc-950 shadow-lg shadow-zinc-950/20" 
-                    : "bg-zinc-50 text-zinc-500 border-zinc-100 hover:border-zinc-300"
-                )}
-              >
-                <span>{r.emoji}</span>
-                <span>{r.uids.length}</span>
-              </button>
-            ))}
+            <AnimatePresence>
+              {message.reactions.map((r, idx) => (
+                <motion.button
+                  key={`${r.emoji}-${idx}`}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  onClick={() => onReact?.(r.emoji)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all border",
+                    r.uids.includes(currentUserId || '') 
+                      ? "bg-zinc-950 text-white border-zinc-950 shadow-lg shadow-zinc-950/20" 
+                      : "bg-zinc-50 text-zinc-500 border-zinc-100 hover:border-zinc-300"
+                  )}
+                >
+                  <span>{r.emoji}</span>
+                  <span>{r.uids.length}</span>
+                </motion.button>
+              ))}
+            </AnimatePresence>
           </div>
         )}
 

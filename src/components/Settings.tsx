@@ -500,7 +500,10 @@ export function Settings({
                         <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Manage your payment methods</p>
                       </div>
                     </div>
-                    <button className="px-6 py-2 bg-white border border-zinc-200 text-zinc-950 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-50 transition-all">
+                    <button 
+                      onClick={() => setActiveTab('billing')}
+                      className="px-6 py-2 bg-white border border-zinc-200 text-zinc-950 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-50 transition-all"
+                    >
                       Manage
                     </button>
                   </div>

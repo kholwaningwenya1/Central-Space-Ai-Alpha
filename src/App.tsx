@@ -88,6 +88,8 @@ export default function App() {
   const [hasApiKey, setHasApiKey] = useState(true);
   const [activeUsers, setActiveUsers] = useState<any[]>([]);
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
   const { socket, isConnected } = useSocket();
   const lastNotificationIdRef = useRef<string | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -580,6 +582,44 @@ export default function App() {
     return () => clearInterval(interval);
   }, [user, currentSessionId]);
 
+  const showAppToast = useCallback((title: string, message: string, avatarUrl?: string, action?: { label: string, onClick: () => void }) => {
+    const duration = Math.max(6000, Math.min(8000, message.length * 50));
+    toast.custom((t) => (
+      <div className="flex items-start gap-3 w-full bg-white border border-zinc-200 shadow-xl rounded-2xl p-4 relative overflow-hidden">
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="Avatar" className="w-10 h-10 rounded-full object-cover shrink-0" referrerPolicy="no-referrer" />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center shrink-0">
+            <BellIcon className="w-5 h-5 text-zinc-400" />
+          </div>
+        )}
+        <div className="flex flex-col gap-1 min-w-0 flex-1 pr-6">
+          <span className="text-sm font-semibold text-zinc-900 truncate">{title}</span>
+          <span className="text-xs text-zinc-500 line-clamp-2">{message}</span>
+          {action && (
+            <button 
+              onClick={() => {
+                action.onClick();
+                toast.dismiss(t);
+              }}
+              className="mt-2 self-start text-xs font-medium text-zinc-900 bg-zinc-100 px-3 py-1.5 rounded-lg hover:bg-zinc-200 transition-colors"
+            >
+              {action.label}
+            </button>
+          )}
+        </div>
+        <button 
+          onClick={() => toast.dismiss(t)}
+          className="absolute top-3 right-3 p-1 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-full transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    ), { duration });
+  }, []);
+
+  const previousSessionsRef = useRef<WorkspaceSession[]>([]);
+
   // Load sessions from Firestore
   useEffect(() => {
     if (!isAuthReady || !user) {
@@ -597,13 +637,38 @@ export default function App() {
         .map(doc => doc.data() as WorkspaceSession)
         .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
       
+      // Detect new messages for notifications
+      if (previousSessionsRef.current.length > 0) {
+        docs.forEach(session => {
+          const prevSession = previousSessionsRef.current.find(s => s.id === session.id);
+          if (prevSession && session.messages.length > prevSession.messages.length) {
+            const newMessages = session.messages.slice(prevSession.messages.length);
+            newMessages.forEach(msg => {
+              // Don't notify for our own messages
+              if (msg.senderId !== user.uid) {
+                // Only notify if we are not currently looking at this session
+                if (currentSessionId !== session.id) {
+                  showAppToast(
+                    session.title || msg.senderName || 'New Message',
+                    msg.content,
+                    msg.senderPhoto,
+                    { label: 'View', onClick: () => setCurrentSessionId(session.id) }
+                  );
+                }
+              }
+            });
+          }
+        });
+      }
+      
+      previousSessionsRef.current = docs;
       setSessions(docs);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'sessions');
     });
 
     return () => unsubscribe();
-  }, [isAuthReady, user]);
+  }, [isAuthReady, user, currentSessionId, showAppToast]);
 
   // Handle initial session selection
   useEffect(() => {
@@ -1414,6 +1479,76 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
+  const handleExportAudio = async (text: string) => {
+    try {
+      toast.info('Generating audio...');
+      const audioUrl = await generateSpeech(text);
+      const a = document.createElement('a');
+      a.href = audioUrl;
+      a.download = `voice-note-${Date.now()}.wav`;
+      a.click();
+      toast.success('Audio exported successfully');
+    } catch (error) {
+      toast.error('Failed to export audio');
+    }
+  };
+
+  const handleExportImageSketch = async (text: string) => {
+    try {
+      toast.info('Generating image sketch...');
+      const prompt = `Create a simple, clean sketch or diagram summarizing: ${text.substring(0, 200)}`;
+      const imageUrl = await generateImageFromPrompt(prompt);
+      const a = document.createElement('a');
+      a.href = imageUrl;
+      a.download = `sketch-${Date.now()}.png`;
+      a.click();
+      toast.success('Image sketch exported successfully');
+    } catch (error) {
+      toast.error('Failed to export image sketch');
+    }
+  };
+
+  const handleExportZip = async (text: string) => {
+    try {
+      toast.info('Generating ZIP bundle...');
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+      
+      // Add text
+      zip.file('content.txt', text);
+      
+      // Add audio
+      try {
+        const audioUrl = await generateSpeech(text);
+        const audioBlob = await (await fetch(audioUrl)).blob();
+        zip.file('audio.wav', audioBlob);
+      } catch (e) {
+        console.error('Audio generation failed for zip', e);
+      }
+      
+      // Add image
+      try {
+        const prompt = `Create a simple, clean sketch summarizing: ${text.substring(0, 200)}`;
+        const imageUrl = await generateImageFromPrompt(prompt);
+        const imageBlob = await (await fetch(imageUrl)).blob();
+        zip.file('sketch.png', imageBlob);
+      } catch (e) {
+        console.error('Image generation failed for zip', e);
+      }
+      
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bundle-${Date.now()}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('ZIP bundle exported successfully');
+    } catch (error) {
+      toast.error('Failed to export ZIP bundle');
+    }
+  };
+
   return (
     <ErrorBoundary>
       <div className="flex h-screen bg-zinc-50 overflow-hidden">
@@ -1569,6 +1704,76 @@ export default function App() {
               )}
             </div>
             <div className="flex items-center gap-2">
+              {/* User Search */}
+              <div className="relative">
+                <div className="flex items-center bg-zinc-100 rounded-full px-3 py-1.5 focus-within:ring-2 focus-within:ring-zinc-900/20 transition-all">
+                  <Search className="w-3.5 h-3.5 text-zinc-400 mr-2" />
+                  <input
+                    type="text"
+                    placeholder="Find active users..."
+                    value={userSearchQuery}
+                    onChange={(e) => {
+                      setUserSearchQuery(e.target.value);
+                      setIsUserSearchOpen(true);
+                    }}
+                    onFocus={() => setIsUserSearchOpen(true)}
+                    className="bg-transparent border-none text-xs text-zinc-900 focus:outline-none placeholder:text-zinc-400 w-32 md:w-48"
+                  />
+                </div>
+                <AnimatePresence>
+                  {isUserSearchOpen && userSearchQuery && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute top-full right-0 mt-2 w-64 bg-white border border-zinc-200 rounded-2xl shadow-2xl overflow-hidden z-50"
+                    >
+                      <div className="p-2 border-b border-zinc-100 bg-zinc-50/50">
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-2">Active Users</span>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto custom-scrollbar p-1">
+                        {activeUsers.filter(u => u.name.toLowerCase().includes(userSearchQuery.toLowerCase())).length > 0 ? (
+                          activeUsers.filter(u => u.name.toLowerCase().includes(userSearchQuery.toLowerCase())).map(u => (
+                            <button
+                              key={u.id}
+                              onClick={() => {
+                                setIsUserSearchOpen(false);
+                                setUserSearchQuery('');
+                                // Check if direct chat already exists
+                                const existingSession = sessions.find(s => s.type === 'direct' && s.members?.includes(u.id));
+                                if (existingSession) {
+                                  setCurrentSessionId(existingSession.id);
+                                } else {
+                                  handleNewSession('direct', u.name, [u.id]);
+                                }
+                              }}
+                              className="w-full flex items-center gap-3 p-2 hover:bg-zinc-50 rounded-xl transition-all text-left"
+                            >
+                              <div className="relative">
+                                <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center overflow-hidden">
+                                  {u.avatar ? (
+                                    <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                  ) : (
+                                    <span className="text-xs font-bold text-zinc-400">{u.name.charAt(0)}</span>
+                                  )}
+                                </div>
+                                <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-medium text-zinc-900 truncate">{u.name}</span>
+                                <span className="text-[10px] text-emerald-500 font-medium">Active now</span>
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="p-4 text-center text-xs text-zinc-500">No active users found</div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
               <button 
                 onClick={() => setIsGlobalSearchOpen(true)}
                 className="p-2 text-zinc-400 hover:text-zinc-900 transition-colors rounded-md hover:bg-zinc-50"
@@ -1885,6 +2090,7 @@ export default function App() {
                   >
                     <MessageBubble 
                       message={message} 
+                      conversationType={currentSession?.type}
                       onGenerateImage={handleGenerateImage}
                       onGenerateVideo={handleGenerateVideo}
                       onTranslate={(text, lang) => handleTranslate(message.id, text, lang)}
@@ -1895,6 +2101,9 @@ export default function App() {
                       onFindYouTubeLinks={(topic) => handleFindYouTubeLinks(message.id, topic)}
                       onGenerateSpeech={(text) => handleGenerateSpeech(message.id, text)}
                       currentUserId={user?.uid}
+                      onExportAudio={(text) => handleExportAudio(text)}
+                      onExportImageSketch={(text) => handleExportImageSketch(text)}
+                      onExportZip={(text) => handleExportZip(text)}
                     />
                   </motion.div>
                 ))}

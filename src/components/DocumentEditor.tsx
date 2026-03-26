@@ -269,6 +269,30 @@ export function DocumentEditor({
     element.click();
   };
 
+  const exportToPDF = async () => {
+    try {
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF();
+      
+      // Basic PDF generation from text content
+      const splitText = doc.splitTextToSize(content, 180);
+      let y = 20;
+      
+      for (let i = 0; i < splitText.length; i++) {
+        if (y > 280) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(splitText[i], 15, y);
+        y += 7;
+      }
+      
+      doc.save(`document-${new Date().getTime()}.pdf`);
+    } catch (error) {
+      console.error("Failed to export to PDF:", error);
+    }
+  };
+
   const getCursorXY = (element: HTMLTextAreaElement, position: number) => {
     const { offsetLeft: left, offsetTop: top } = element;
     const div = document.createElement('div');
@@ -369,6 +393,7 @@ export function DocumentEditor({
             <button onClick={() => insertText('- ')} className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all" title="Bullet List"><List className="w-4 h-4" /></button>
             <button onClick={() => setShowFindReplace(!showFindReplace)} className={cn("p-2 rounded-lg transition-all", showFindReplace ? "bg-zinc-200 text-zinc-900" : "text-zinc-500 hover:text-zinc-900 hover:bg-white")} title="Find and Replace"><Search className="w-4 h-4" /></button>
             <button onClick={exportToMarkdown} className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all" title="Export as Markdown"><Download className="w-4 h-4" /></button>
+            <button onClick={exportToPDF} className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all" title="Export as PDF"><FileType className="w-4 h-4" /></button>
           </div>
         </div>
 

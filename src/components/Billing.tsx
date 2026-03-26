@@ -129,7 +129,7 @@ export function Billing({ userProfile, onPlanUpdate }: BillingProps) {
               </button>
             ) : (
               <div className="space-y-4">
-                <PayPalScriptProvider options={{ clientId: "test" }}>
+                <PayPalScriptProvider options={{ clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID || "test" }}>
                   <PayPalButtons
                     style={{ layout: "vertical", shape: "pill", label: "subscribe" }}
                     createOrder={(data, actions) => {
@@ -167,7 +167,10 @@ export function Billing({ userProfile, onPlanUpdate }: BillingProps) {
             <p className="text-zinc-400 text-sm font-medium leading-relaxed">
               For large organizations requiring custom integrations, dedicated support, and advanced security features, our Enterprise team is ready to help.
             </p>
-            <button className="px-8 py-4 bg-white text-zinc-950 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-zinc-200 transition-all">
+            <button 
+              onClick={() => window.location.href = 'mailto:sales@example.com'}
+              className="px-8 py-4 bg-white text-zinc-950 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-zinc-200 transition-all"
+            >
               Contact Sales
             </button>
           </div>

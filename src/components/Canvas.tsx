@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Stage, Layer, Line, Rect, Circle, Transformer, Text, Image as KonvaImage } from 'react-konva';
-import { Square, Circle as CircleIcon, Type, MousePointer2, Pencil, Eraser, Trash2, Download, Undo2, Redo2, Minus, Plus } from 'lucide-react';
+import { Square, Circle as CircleIcon, Type, MousePointer2, Pencil, Eraser, Trash2, Download, Undo2, Redo2, Minus, Plus, FileType } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useSocket } from '../contexts/SocketContext';
 
@@ -242,6 +242,23 @@ export function Canvas({ data, onSave, sessionId }: CanvasProps) {
     document.body.removeChild(link);
   };
 
+  const exportToPDF = async () => {
+    try {
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: [window.innerWidth, window.innerHeight]
+      });
+      
+      const uri = stageRef.current.toDataURL({ pixelRatio: 2 });
+      doc.addImage(uri, 'PNG', 0, 0, window.innerWidth, window.innerHeight);
+      doc.save(`canvas-${new Date().getTime()}.pdf`);
+    } catch (error) {
+      console.error("Failed to export to PDF:", error);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col bg-zinc-50 relative overflow-hidden font-sans">
       {/* Toolbar */}
@@ -288,8 +305,11 @@ export function Canvas({ data, onSave, sessionId }: CanvasProps) {
           <button onClick={() => { setLines([]); setShapes([]); onSave({ lines: [], shapes: [] }); }} className="p-2.5 text-zinc-400 hover:text-red-500 rounded-xl hover:bg-red-50 transition-colors" title="Clear All">
             <Trash2 className="w-5 h-5" />
           </button>
-          <button onClick={downloadCanvas} className="p-2.5 text-zinc-400 hover:text-zinc-900 rounded-xl hover:bg-zinc-100 transition-colors" title="Download">
+          <button onClick={downloadCanvas} className="p-2.5 text-zinc-400 hover:text-zinc-900 rounded-xl hover:bg-zinc-100 transition-colors" title="Download PNG">
             <Download className="w-5 h-5" />
+          </button>
+          <button onClick={exportToPDF} className="p-2.5 text-zinc-400 hover:text-zinc-900 rounded-xl hover:bg-zinc-100 transition-colors" title="Export as PDF">
+            <FileType className="w-5 h-5" />
           </button>
         </div>
 
