@@ -21,7 +21,7 @@ import { useSocket } from './contexts/SocketContext';
 import { Send, Loader2, PlusCircle, Trash2, Paperclip, X, Download, Mic, LogIn, LogOut, AlertCircle, MicOff, Search, FileText, FileSpreadsheet, Shield, Sparkles, Bot as BotIcon, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  auth, db, googleProvider, signInWithPopup, onAuthStateChanged, 
+  auth, db, googleProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, 
   collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDoc, addDoc, User,
   handleFirestoreError, OperationType
 } from './firebase';
@@ -481,6 +481,11 @@ export default function App() {
 
   // Auth listener
   useEffect(() => {
+    getRedirectResult(auth).catch((error) => {
+      console.error("Redirect login error:", error);
+      toast.error("Login failed. Please try again.");
+    });
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       setIsAuthReady(true);
@@ -781,9 +786,17 @@ export default function App() {
 
   const handleLogin = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const isIframe = window !== window.parent;
+      
+      if (isMobile && !isIframe) {
+        await signInWithRedirect(auth, googleProvider);
+      } else {
+        await signInWithPopup(auth, googleProvider);
+      }
     } catch (error) {
       console.error('Login failed', error);
+      toast.error('Login failed. Please try again.');
     }
   };
 
