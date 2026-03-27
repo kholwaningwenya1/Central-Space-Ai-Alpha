@@ -129,7 +129,7 @@ export function Billing({ userProfile, onPlanUpdate }: BillingProps) {
               </button>
             ) : (
               <div className="space-y-4">
-                <PayPalScriptProvider options={{ clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID || "test" }}>
+                <PayPalScriptProvider options={{ clientId: process.env.VITE_PAYPAL_CLIENT_ID || "test" }}>
                   <PayPalButtons
                     style={{ layout: "vertical", shape: "pill", label: "subscribe" }}
                     createOrder={(data, actions) => {

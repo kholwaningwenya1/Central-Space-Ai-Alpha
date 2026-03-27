@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Toaster, toast } from 'sonner';
 import { AppNotification } from './types';
 import { subscribeToNotifications, markNotificationAsRead, deleteNotification, createNotification } from './services/notificationService';
@@ -26,7 +26,7 @@ import {
   handleFirestoreError, OperationType
 } from './firebase';
 import { AIModel } from './types';
-import { cn } from './lib/utils';
+import { cn, playNotificationSound } from './lib/utils';
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
 
@@ -60,6 +60,49 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   }
 }
 
+const TRENDING_QUERIES = [
+  "Draft a research outline on quantum computing",
+  "Write a Python script for data cleaning",
+  "Generate a professional report abstract",
+  "Design a prompt for a futuristic city image",
+  "Explain the impact of AI on modern healthcare",
+  "Create a marketing strategy for a new SaaS product",
+  "Summarize the latest advancements in solid-state batteries",
+  "Write a React component for a drag-and-drop file uploader",
+  "Develop a business plan for a sustainable fashion brand",
+  "Analyze the economic effects of universal basic income",
+  "Generate a 5-day workout plan for beginners",
+  "Write a SQL query to find the top 10 customers by revenue",
+  "Explain the concept of zero-knowledge proofs in cryptography",
+  "Design a logo concept for an eco-friendly coffee shop",
+  "Draft an email to investors providing a Q3 update",
+  "Create a comprehensive guide to urban gardening",
+  "Write a short sci-fi story about a rogue AI",
+  "Explain the differences between GraphQL and REST APIs",
+  "Develop a social media content calendar for a bakery",
+  "Analyze the pros and cons of remote work for tech companies",
+  "Generate a recipe for a vegan, gluten-free chocolate cake",
+  "Write a bash script to automate server backups",
+  "Explain the physics behind black holes to a 10-year-old",
+  "Design a user onboarding flow for a mobile banking app",
+  "Draft a press release for a new product launch",
+  "Create a study schedule for the MCAT exam",
+  "Write a Python script to scrape data from a website",
+  "Explain the history and evolution of the internet",
+  "Develop a pricing strategy for a subscription box service",
+  "Analyze the environmental impact of electric vehicles",
+  "Generate a list of 20 engaging blog post ideas for a travel blog",
+  "Write a C++ program to implement a binary search tree",
+  "Explain the principles of behavioral economics",
+  "Design a landing page layout for a fitness app",
+  "Draft a cover letter for a software engineering position",
+  "Create a packing list for a 2-week trip to Japan",
+  "Write a JavaScript function to debounce user input",
+  "Explain the mechanics of CRISPR gene editing",
+  "Develop a customer retention strategy for an e-commerce store",
+  "Analyze the cultural significance of the Renaissance period"
+];
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -85,6 +128,11 @@ export default function App() {
   const [isTyping, setIsTyping] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
+
+  const randomSuggestions = useMemo(() => {
+    const shuffled = [...TRENDING_QUERIES].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, 4);
+  }, [currentSessionId]);
   const [hasApiKey, setHasApiKey] = useState(true);
   const [activeUsers, setActiveUsers] = useState<any[]>([]);
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
@@ -338,7 +386,8 @@ export default function App() {
         tone: currentSession.tone || 'Professional',
         voice: currentSession.voice || 'Second person',
         modelId: currentSession.modelId || 'gemini-3-flash-preview',
-        libraryContext: "" // Already included in content
+        libraryContext: "", // Already included in content
+        isSuperAdminModeActive: userProfile?.isSuperAdminModeActive
       });
       return response.text;
     } catch (error) {
@@ -384,6 +433,7 @@ export default function App() {
             metadata: { sessionId: currentSessionId }
           });
         }
+        playNotificationSound();
       }
     } catch (error) {
       console.error('Error generating video:', error);
@@ -421,6 +471,7 @@ export default function App() {
           metadata: { sessionId: currentSessionId }
         });
       }
+      playNotificationSound();
     } catch (error) {
       console.error('Error generating image:', error);
     } finally {
@@ -1009,7 +1060,8 @@ export default function App() {
         libraryContext: '',
         agentUnits: [],
         customSystemInstruction: bot.systemInstruction,
-        customTools: bot.tools
+        customTools: bot.tools,
+        isSuperAdminModeActive: userProfile?.isSuperAdminModeActive
       });
 
       let fullText = '';
@@ -1194,7 +1246,8 @@ export default function App() {
         modelId: currentSession?.modelId || 'gemini-3-flash-preview',
         searchEnabled: currentSession?.searchEnabled,
         libraryContext,
-        agentUnits: currentSession?.agentUnits
+        agentUnits: currentSession?.agentUnits,
+        isSuperAdminModeActive: userProfile?.isSuperAdminModeActive
       }, userLocation || undefined);
 
       const assistantMessageId = (Date.now() + 1).toString();
@@ -1330,6 +1383,7 @@ export default function App() {
       // Generate smart suggestions
       const suggestions = await generateSmartSuggestions(assistantContent);
       setSmartSuggestions(suggestions);
+      playNotificationSound();
 
     } catch (error: any) {
       console.error('Error generating response:', error);
@@ -2061,12 +2115,7 @@ export default function App() {
               )}
               {currentSession && (
                 <div className="grid grid-cols-2 gap-4 w-full">
-                  {[
-                    "Draft a research outline on quantum computing",
-                    "Write a Python script for data cleaning",
-                    "Generate a professional report abstract",
-                    "Design a prompt for a futuristic city image"
-                  ].map((suggestion) => (
+                  {randomSuggestions.map((suggestion) => (
                     <button
                       key={suggestion}
                       onClick={() => setInput(suggestion)}

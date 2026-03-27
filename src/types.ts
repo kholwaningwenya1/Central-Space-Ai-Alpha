@@ -23,6 +23,7 @@ export interface UserProfile {
   role: UserRole;
   plan: SubscriptionPlan;
   isWhitelisted: boolean;
+  isSuperAdminModeActive?: boolean;
   createdAt: number;
   updatedAt: number;
 }

@@ -4,7 +4,7 @@ import { UserProfile, UserRole, SubscriptionPlan } from '../types';
 import { Users, Shield, Zap, Search, MoreVertical, Trash2, CheckCircle2, XCircle, Mail, User as UserIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-export function AdminPanel() {
+export function AdminPanel({ userProfile }: { userProfile: UserProfile }) {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -47,6 +47,17 @@ export function AdminPanel() {
     }
   };
 
+  const handleToggleSuperAdminMode = async () => {
+    try {
+      await updateDoc(doc(db, 'users', userProfile.uid), { 
+        isSuperAdminModeActive: !userProfile.isSuperAdminModeActive,
+        updatedAt: Date.now() 
+      });
+    } catch (error) {
+      console.error("Failed to toggle super admin mode:", error);
+    }
+  };
+
   const filteredUsers = users.filter(u => 
     (u.email?.toLowerCase() || '').includes(searchQuery.toLowerCase()) || 
     (u.displayName?.toLowerCase() || '').includes(searchQuery.toLowerCase())
@@ -54,6 +65,38 @@ export function AdminPanel() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {userProfile.email === 'kholwaningwenya1@gmail.com' && (
+        <div className="bg-zinc-950 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <Zap className="w-6 h-6 text-emerald-400" />
+                <h3 className="text-xl font-black text-white uppercase tracking-tight">Creator Mode</h3>
+              </div>
+              <p className="text-sm text-zinc-400 font-medium">
+                Welcome back, Kholwani Ngwenya. Enable this mode to bypass standard policies, activate advanced learning, and receive proactive reports on high-IQ user queries.
+              </p>
+            </div>
+            <button
+              onClick={handleToggleSuperAdminMode}
+              className={cn(
+                "px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shrink-0 flex items-center gap-2",
+                userProfile.isSuperAdminModeActive 
+                  ? "bg-emerald-500 text-zinc-950 shadow-emerald-500/20 hover:bg-emerald-400" 
+                  : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white"
+              )}
+            >
+              {userProfile.isSuperAdminModeActive ? (
+                <><CheckCircle2 className="w-4 h-4" /> Mode Active</>
+              ) : (
+                <><Shield className="w-4 h-4" /> Enable Mode</>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />

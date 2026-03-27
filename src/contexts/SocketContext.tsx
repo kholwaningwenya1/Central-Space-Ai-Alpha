@@ -17,7 +17,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     const socketInstance = io(window.location.origin, {
       transports: ['websocket'],
-      autoConnect: true
+      autoConnect: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
     });
 
     socketInstance.on('connect', () => {
@@ -25,8 +29,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsConnected(true);
     });
 
-    socketInstance.on('disconnect', () => {
-      console.log('Disconnected from WebSocket server');
+    socketInstance.on('connect_error', (err) => {
+      console.warn('WebSocket connection error:', err.message);
+      setIsConnected(false);
+    });
+
+    socketInstance.on('disconnect', (reason) => {
+      console.log('Disconnected from WebSocket server:', reason);
       setIsConnected(false);
     });
 

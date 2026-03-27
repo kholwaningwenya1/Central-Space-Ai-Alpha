@@ -554,7 +554,7 @@ export function Settings({
         )}
 
         {activeTab === 'admin' && userProfile?.role === 'super_admin' && (
-          <AdminPanel />
+          <AdminPanel userProfile={userProfile} />
         )}
 
         {activeTab === 'about' && (
@@ -565,7 +565,7 @@ export function Settings({
                   <Zap className="w-12 h-12 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-3xl font-black text-zinc-950 tracking-tighter uppercase italic">Workspace OS</h2>
+                  <h2 className="text-3xl font-black text-zinc-950 tracking-tighter uppercase italic">Central Space AI</h2>
                   <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Version 2.4.0 (Stable)</p>
                 </div>
               </div>

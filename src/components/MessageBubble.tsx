@@ -1,13 +1,14 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Message, ConversationType } from '../types';
-import { cn } from '../lib/utils';
+import { cn, playNotificationSound } from '../lib/utils';
 import { User, Bot as BotIcon, Copy, Check, FileText, ExternalLink, Download, FileSpreadsheet, Volume2, Image as ImageIcon, Video, MapPin, Languages, Loader2, Cpu, Sparkles, Share2, Smile, BarChart2, Trash2, Pencil, Youtube, Headphones, FileArchive } from 'lucide-react';
 import { useState } from 'react';
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, isToday, isYesterday } from 'date-fns';
+import { toast } from 'sonner';
 
 const formatMessageTime = (timestamp: number) => {
   const date = new Date(timestamp);
@@ -106,8 +107,14 @@ export function MessageBubble({ message, conversationType = 'workspace', onGener
   const handleGenerateSpeech = async () => {
     if (!onGenerateSpeech) return;
     setIsGeneratingSpeech(true);
+    toast('Your audio is being prepared', {
+      duration: 3000,
+      position: 'bottom-right',
+      icon: '🎧',
+    });
     try {
       await onGenerateSpeech(message.content);
+      playNotificationSound();
     } finally {
       setIsGeneratingSpeech(false);
     }
@@ -346,7 +353,7 @@ export function MessageBubble({ message, conversationType = 'workspace', onGener
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="absolute right-4 top-10 flex flex-col items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/90 backdrop-blur-md border border-zinc-100 shadow-xl rounded-2xl p-1.5 z-50">
             {message.senderId === currentUserId && !isAssistant && !isBot && (
               <>
                 <button 
@@ -379,7 +386,7 @@ export function MessageBubble({ message, conversationType = 'workspace', onGener
                     initial={{ opacity: 0, scale: 0.9, y: 10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                    className="absolute bottom-full right-0 mb-2 p-2 bg-white border border-zinc-100 rounded-2xl shadow-2xl flex gap-1 z-50"
+                    className="absolute right-full top-0 mr-2 p-2 bg-white border border-zinc-100 rounded-2xl shadow-2xl flex gap-1 z-50"
                   >
                     {commonEmojis.map(emoji => (
                       <button
@@ -450,7 +457,7 @@ export function MessageBubble({ message, conversationType = 'workspace', onGener
                     <button className="p-2 rounded-lg text-zinc-400 hover:text-zinc-950 hover:bg-zinc-50 transition-all flex items-center gap-1" title="Export Options">
                       <Download className="w-4 h-4" />
                     </button>
-                    <div className="absolute bottom-full right-0 mb-2 w-48 bg-white border border-zinc-200 shadow-xl rounded-xl p-2 opacity-0 invisible group-hover/export:opacity-100 group-hover/export:visible transition-all z-50">
+                    <div className="absolute right-full top-0 mr-2 w-48 bg-white border border-zinc-200 shadow-xl rounded-xl p-2 opacity-0 invisible group-hover/export:opacity-100 group-hover/export:visible transition-all z-50">
                       <button onClick={() => onExportAudio?.(message.content)} className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 rounded-lg flex items-center gap-2">
                         <Headphones className="w-3.5 h-3.5" /> Voice Note (WAV)
                       </button>
