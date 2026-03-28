@@ -17,6 +17,7 @@ import { Message, Tone, Voice, WorkspaceSession, FileData, SessionMode, Bot, Pre
 import { GoogleGenAI } from "@google/genai";
 import { generateChatResponse, generateChatResponseStream, generateImageFromPrompt, generateVideoFromPrompt, transcribeAudio, translateText, findYouTubeLinks, generateSpeech } from './services/aiService';
 import { LiveMode } from './components/LiveMode';
+import { MobileLogin } from './components/MobileLogin';
 import { useSocket } from './contexts/SocketContext';
 import { Send, Loader2, PlusCircle, Trash2, Paperclip, X, Download, Mic, LogIn, LogOut, AlertCircle, MicOff, Search, FileText, FileSpreadsheet, Shield, Sparkles, Bot as BotIcon, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -128,6 +129,13 @@ export default function App() {
   const [isTyping, setIsTyping] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(window.innerWidth < 1024);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobileView(window.innerWidth < 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const randomSuggestions = useMemo(() => {
     const shuffled = [...TRENDING_QUERIES].sort(() => 0.5 - Math.random());
@@ -487,6 +495,13 @@ export default function App() {
     });
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // Check if user is using password auth and is NOT verified
+      if (user && user.providerData.some(p => p.providerId === 'password') && !user.emailVerified) {
+        setUser(null);
+        setIsAuthReady(true);
+        return;
+      }
+
       setUser(user);
       setIsAuthReady(true);
       if (user) {
@@ -1616,6 +1631,18 @@ export default function App() {
     }
   };
 
+  if (!isAuthReady) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-zinc-50">
+        <Loader2 className="w-8 h-8 text-zinc-900 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <MobileLogin onLogin={handleLogin} />;
+  }
+
   return (
     <ErrorBoundary>
       <div className="flex h-screen bg-zinc-50 overflow-hidden">
@@ -2079,35 +2106,14 @@ export default function App() {
                 onScroll={handleScroll}
                 className="flex-1 overflow-y-auto scroll-smooth"
               >
-            {!user ? (
-              <div className="h-full flex flex-col items-center justify-center p-12 text-center max-w-2xl mx-auto font-sans">
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mb-12 inline-flex items-center justify-center w-24 h-24 bg-zinc-950 rounded-[2.5rem] shadow-2xl shadow-zinc-950/20 rotate-12 hover:rotate-0 transition-transform duration-500"
-                >
-                  <Sparkles className="w-12 h-12 text-white" />
-                </motion.div>
-                <h1 className="text-5xl font-bold text-zinc-950 mb-6 tracking-tight font-display">Central Space</h1>
-                <p className="text-zinc-500 mb-12 text-xl leading-relaxed font-medium">
-                  The ultimate workspace for creative intelligence and agentic collaboration.
-                </p>
-                <button 
-                  onClick={handleLogin}
-                  className="px-10 py-4 bg-zinc-950 text-white rounded-2xl font-bold text-lg hover:bg-zinc-800 transition-all flex items-center gap-4 shadow-2xl shadow-zinc-950/10 active:scale-[0.98] group"
-                >
-                  <LogIn className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
-                  Continue with Google
-                </button>
-              </div>
-            ) : !currentSession || currentSession.messages.length === 0 ? (
+            {!currentSession || currentSession.messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center p-12 text-center max-w-2xl mx-auto font-sans">
               <motion.div 
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="w-24 h-24 bg-zinc-50 rounded-[2.5rem] flex items-center justify-center mb-10 shadow-inner"
+                className="w-24 h-24 bg-zinc-50 rounded-[2.5rem] flex items-center justify-center mb-10 shadow-inner overflow-hidden"
               >
-                <Sparkles className="w-12 h-12 text-zinc-300 animate-pulse" />
+                <img src="/logo.png" alt="Central Space Logo" className="w-full h-full object-cover animate-pulse" />
               </motion.div>
               <h1 className="text-4xl font-bold text-zinc-950 mb-6 tracking-tight font-display">
                 {currentSession ? "Start Your Workspace" : "Welcome to Central Space"}
@@ -2172,8 +2178,8 @@ export default function App() {
               </AnimatePresence>
               {isLoading && (
                 <div className="p-10 flex gap-8 bg-white/50 backdrop-blur-sm animate-in">
-                  <div className="w-12 h-12 rounded-2xl bg-zinc-950 flex items-center justify-center shrink-0 shadow-2xl shadow-zinc-950/20 rotate-3 animate-bounce">
-                    <Sparkles className="w-6 h-6 text-white" />
+                  <div className="w-12 h-12 rounded-2xl bg-zinc-950 flex items-center justify-center shrink-0 shadow-2xl shadow-zinc-950/20 rotate-3 animate-bounce overflow-hidden">
+                    <img src="/logo.png" alt="Central Space Logo" className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1 space-y-6 py-2">
                     <div className="flex items-center gap-3">
