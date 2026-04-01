@@ -33,9 +33,10 @@ interface MessageBubbleProps {
   onExportAudio?: (text: string) => void;
   onExportImageSketch?: (text: string) => void;
   onExportZip?: (text: string) => void;
+  onDownload?: (url: string, filename: string) => void;
 }
 
-export function MessageBubble({ message, conversationType = 'workspace', onGenerateImage, onGenerateVideo, onTranslate, onReact, onVote, onDelete, onEdit, onFindYouTubeLinks, onGenerateSpeech, currentUserId, onExportAudio, onExportImageSketch, onExportZip }: MessageBubbleProps) {
+export function MessageBubble({ message, conversationType = 'workspace', onGenerateImage, onGenerateVideo, onTranslate, onReact, onVote, onDelete, onEdit, onFindYouTubeLinks, onGenerateSpeech, currentUserId, onExportAudio, onExportImageSketch, onExportZip, onDownload }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
@@ -732,14 +733,13 @@ export function MessageBubble({ message, conversationType = 'workspace', onGener
             />
             <div className="absolute inset-0 bg-zinc-950/0 group-hover:bg-zinc-950/10 transition-colors duration-500 pointer-events-none" />
             <div className="absolute top-6 right-6 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <a 
-                href={message.imageUrl} 
-                download={`CentralSpace_Image_${Date.now()}.png`}
+              <button 
+                onClick={() => onDownload?.(message.imageUrl!, `CentralSpace_Image_${Date.now()}.png`)}
                 className="p-3 bg-white/90 backdrop-blur-xl shadow-2xl rounded-2xl hover:bg-white transition-all active:scale-95"
                 title="Download"
               >
                 <Download className="w-5 h-5 text-zinc-950" />
-              </a>
+              </button>
             </div>
           </motion.div>
         )}
@@ -756,14 +756,13 @@ export function MessageBubble({ message, conversationType = 'workspace', onGener
               className="w-full h-auto max-h-[600px] object-cover"
             />
             <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <a 
-                href={message.videoUrl} 
-                download={`CentralSpace_Video_${Date.now()}.mp4`}
+              <button 
+                onClick={() => onDownload?.(message.videoUrl!, `CentralSpace_Video_${Date.now()}.mp4`)}
                 className="p-3 bg-white/90 backdrop-blur-xl shadow-2xl rounded-2xl hover:bg-white transition-all active:scale-95"
                 title="Download"
               >
                 <Download className="w-5 h-5 text-zinc-950" />
-              </a>
+              </button>
             </div>
           </motion.div>
         )}
@@ -778,14 +777,13 @@ export function MessageBubble({ message, conversationType = 'workspace', onGener
               <Headphones className="w-6 h-6 text-emerald-600" />
             </div>
             <audio src={message.audioUrl} controls className="w-full max-w-md h-12" />
-            <a 
-              href={message.audioUrl} 
-              download={`CentralSpace_Audio_${Date.now()}.wav`}
+            <button 
+              onClick={() => onDownload?.(message.audioUrl!, `CentralSpace_Audio_${Date.now()}.wav`)}
               className="p-3 ml-auto bg-white shadow-sm border border-zinc-100 rounded-xl hover:bg-zinc-50 transition-all active:scale-95"
               title="Download Audio"
             >
               <Download className="w-5 h-5 text-zinc-600" />
-            </a>
+            </button>
           </motion.div>
         )}
       </div>

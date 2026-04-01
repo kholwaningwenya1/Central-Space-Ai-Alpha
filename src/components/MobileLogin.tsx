@@ -14,6 +14,7 @@ export function MobileLogin({ onLogin }: MobileLoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,14 +26,15 @@ export function MobileLogin({ onLogin }: MobileLoginProps) {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(userCredential.user, { displayName: fullName });
-      await sendEmailVerification(userCredential.user);
-      await auth.signOut(); // Sign out immediately so they have to log in again
-      toast.success('Account created! Please check your email for the verification link before logging in.');
-      setMode('login');
-      setPassword('');
+      toast.success('Account created successfully!');
     } catch (error: any) {
       console.error(error);
-      toast.error(error.message || 'Failed to sign up');
+      if (error.code === 'auth/email-already-in-use') {
+        toast.error('This email is already registered. Please log in instead.');
+        setMode('login');
+      } else {
+        toast.error(error.message || 'Failed to sign up');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -46,14 +48,7 @@ export function MobileLogin({ onLogin }: MobileLoginProps) {
     }
     setIsLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      if (!userCredential.user.emailVerified) {
-        await auth.signOut();
-        toast.error('Please verify your email address first. Check your inbox for the verification link.');
-        setIsLoading(false);
-        return;
-      }
-      // If verified, App.tsx will pick up the auth state change automatically
+      await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {
       console.error(error);
       toast.error('Invalid email or password');
@@ -86,9 +81,19 @@ export function MobileLogin({ onLogin }: MobileLoginProps) {
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.4 }}
-          className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center mb-4 border border-white/20 shadow-2xl overflow-hidden"
+          className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center mb-4 border border-white/20 shadow-2xl overflow-hidden p-2"
         >
-          <img src="/logo.png" alt="Central Space Logo" className="w-full h-full object-cover" />
+          {!imageError ? (
+            <img 
+              src="/logo.png" 
+              alt="Central Space Logo" 
+              className="w-full h-full object-contain" 
+              referrerPolicy="no-referrer"
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <Sparkles className="w-8 h-8 text-cyan-400" />
+          )}
         </motion.div>
 
         <h1 className="text-3xl font-bold text-white mb-2 tracking-tight font-display">

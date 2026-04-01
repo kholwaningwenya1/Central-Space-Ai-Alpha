@@ -13,14 +13,17 @@ import { Directory } from './components/Directory';
 import { BotPlatform } from './components/BotPlatform';
 import { MediaHub } from './components/MediaHub';
 import { Settings } from './components/Settings';
+import { Billing } from './components/Billing';
+import { AdminPanel } from './components/AdminPanel';
 import { Message, Tone, Voice, WorkspaceSession, FileData, SessionMode, Bot, Presence, ConversationType, Reaction, Poll, DocumentVersion, DocumentTemplate, UserProfile, SubscriptionPlan, UserRole, ResultType } from './types';
 import { GoogleGenAI } from "@google/genai";
 import { generateChatResponse, generateChatResponseStream, generateImageFromPrompt, generateVideoFromPrompt, transcribeAudio, translateText, findYouTubeLinks, generateSpeech } from './services/aiService';
 import { LiveMode } from './components/LiveMode';
 import { MobileLogin } from './components/MobileLogin';
 import { useSocket } from './contexts/SocketContext';
-import { Send, Loader2, PlusCircle, Trash2, Paperclip, X, Download, Mic, LogIn, LogOut, AlertCircle, MicOff, Search, FileText, FileSpreadsheet, Shield, Sparkles, Bot as BotIcon, Users } from 'lucide-react';
+import { Send, Loader2, PlusCircle, Trash2, Paperclip, X, Download, Mic, LogIn, LogOut, AlertCircle, MicOff, Search, FileText, FileSpreadsheet, Shield, Sparkles, Bot as BotIcon, Users, Smile, Image as ImageIcon, Folder } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import EmojiPicker from 'emoji-picker-react';
 import { 
   auth, db, googleProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, 
   collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDoc, addDoc, User,
@@ -28,6 +31,7 @@ import {
 } from './firebase';
 import { AIModel } from './types';
 import { cn, playNotificationSound } from './lib/utils';
+import { checkUsageLimit, incrementUsage } from './lib/usage';
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
 
@@ -119,6 +123,9 @@ export default function App() {
   const [isLiveModeOpen, setIsLiveModeOpen] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [isAttachmentMenuOpen, setIsAttachmentMenuOpen] = useState(false);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void } | null>(null);
   const [showCommandSuggestions, setShowCommandSuggestions] = useState(false);
@@ -142,7 +149,8 @@ export default function App() {
     return shuffled.slice(0, 4);
   }, [currentSessionId]);
   const [hasApiKey, setHasApiKey] = useState(true);
-  const [activeUsers, setActiveUsers] = useState<any[]>([]);
+  const [roomUsers, setRoomUsers] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
@@ -166,24 +174,48 @@ export default function App() {
     checkApiKey();
   }, []);
 
+  // Fetch all users for direct messaging
+  useEffect(() => {
+    if (!user) return;
+    
+    const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
+      const users = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })).filter(u => u.id !== user.uid); // Exclude self
+      setAllUsers(users);
+    }, (error) => {
+      console.error('Error fetching users:', error);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
   // Socket room joining and presence
   useEffect(() => {
     if (socket && isConnected && currentSessionId && user) {
+      const currentSession = sessions.find(s => s.id === currentSessionId);
       socket.emit('join-room', { 
         roomId: currentSessionId, 
         user: { 
-          id: user.uid, 
-          name: user.displayName || 'Anonymous', 
-          avatar: user.photoURL 
-        } 
+          uid: user.uid, 
+          displayName: user.displayName || 'Anonymous', 
+          photoURL: user.photoURL,
+          color: '#' + Math.floor(Math.random()*16777215).toString(16) // Random color for cursor
+        },
+        initialState: {
+          doc: currentSession?.documentData || '',
+          canvas: currentSession?.canvasData || { lines: [], shapes: [] }
+        }
       });
 
       socket.on('presence-update', (users: any[]) => {
-        setActiveUsers(users);
+        setRoomUsers(users);
       });
 
       return () => {
         socket.off('presence-update');
+        socket.emit('leave-room', { roomId: currentSessionId });
       };
     }
   }, [socket, isConnected, currentSessionId, user]);
@@ -255,7 +287,9 @@ export default function App() {
   const generateSmartSuggestions = async (lastAssistantMessage: string) => {
     if (!lastAssistantMessage) return [];
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error('API key is missing');
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: `Based on the following AI response, suggest 3 short, relevant follow-up questions or actions the user might want to take. Return ONLY a JSON array of strings.
@@ -283,7 +317,7 @@ export default function App() {
       const presence: Presence = {
         uid: user.uid,
         displayName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
-        photoURL: user.photoURL || undefined,
+        photoURL: user.photoURL || null,
         lastActive: Date.now()
       };
       
@@ -406,6 +440,10 @@ export default function App() {
 
   const handleGenerateVideo = async (prompt: string) => {
     if (!currentSessionId || isGeneratingVideo) return;
+    if (!checkUsageLimit(userProfile, 'sketching')) {
+      toast.error('Video generation limit reached for your plan. Please upgrade to generate more videos.');
+      return;
+    }
     
     // Check for API key before generating video
     if (window.aistudio?.hasSelectedApiKey) {
@@ -442,6 +480,7 @@ export default function App() {
           });
         }
         playNotificationSound();
+        await incrementUsage(userProfile, 'sketching');
       }
     } catch (error) {
       console.error('Error generating video:', error);
@@ -454,6 +493,10 @@ export default function App() {
 
   const handleGenerateImage = async (prompt: string) => {
     if (!currentSessionId || isGeneratingImage) return;
+    if (!checkUsageLimit(userProfile, 'sketching')) {
+      toast.error('Sketching limit reached for your plan. Please upgrade to generate more images.');
+      return;
+    }
     
     setIsGeneratingImage(true);
     try {
@@ -480,6 +523,7 @@ export default function App() {
         });
       }
       playNotificationSound();
+      await incrementUsage(userProfile, 'sketching');
     } catch (error) {
       console.error('Error generating image:', error);
     } finally {
@@ -495,13 +539,6 @@ export default function App() {
     });
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      // Check if user is using password auth and is NOT verified
-      if (user && user.providerData.some(p => p.providerId === 'password') && !user.emailVerified) {
-        setUser(null);
-        setIsAuthReady(true);
-        return;
-      }
-
       setUser(user);
       setIsAuthReady(true);
       if (user) {
@@ -511,7 +548,7 @@ export default function App() {
           // Initial fetch and setup
           const userSnap = await getDoc(userRef);
           const isSuperAdmin = user.email === "kholwaningwenya1@gmail.com";
-          const whitelistedEmails = ["central46labs@gmail.com", "kholwani141@gmail.com", "centralspace00@gmail.com"];
+          const whitelistedEmails = ["central46labs@gmail.com", "kholwani141@gmail.com", "centralspace00@gmail.com", "kholwaningwenya1@gmail.com"];
           const isWhitelisted = whitelistedEmails.includes(user.email || "");
 
           if (!userSnap.exists()) {
@@ -519,7 +556,7 @@ export default function App() {
               uid: user.uid,
               email: user.email || '',
               displayName: user.displayName || 'Anonymous',
-              photoURL: user.photoURL || undefined,
+              photoURL: user.photoURL || null,
               role: isSuperAdmin ? 'super_admin' : 'user',
               plan: isWhitelisted ? 'corporate' : 'free',
               isWhitelisted: isWhitelisted,
@@ -536,7 +573,7 @@ export default function App() {
               profile.role = 'super_admin';
               needsUpdate = true;
             }
-            if (isWhitelisted && !profile.isWhitelisted) {
+            if (isWhitelisted && (!profile.isWhitelisted || profile.plan !== 'corporate')) {
               profile.isWhitelisted = true;
               profile.plan = 'corporate';
               needsUpdate = true;
@@ -572,8 +609,12 @@ export default function App() {
               setUserProfile(profile);
             }
           }
-        } catch (error) {
-          console.error("Error syncing user profile:", error);
+        } catch (error: any) {
+          if (error?.message?.includes('client is offline')) {
+            console.warn("Client is offline. Will sync profile when online.");
+          } else {
+            console.error("Error syncing user profile:", error);
+          }
         }
       } else {
         setUserProfile(null);
@@ -637,7 +678,7 @@ export default function App() {
       const presenceData: Presence = {
         uid: user.uid,
         displayName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
-        photoURL: user.photoURL || undefined,
+        photoURL: user.photoURL || null,
         lastActive: Date.now(),
         status: 'online'
       };
@@ -748,8 +789,40 @@ export default function App() {
     }
   }, [isAuthReady, user, sessions, currentSessionId]);
 
+  const updateSession = useCallback(async (id: string, updates: Partial<WorkspaceSession>) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'sessions', id), { ...updates, updatedAt: Date.now() });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `sessions/${id}`);
+    }
+  }, [user]);
+
   const handleNewSession = useCallback(async (type: ConversationType = 'workspace', title: string = 'New Workspace', members: string[] = [user!.uid]) => {
     if (!user) return;
+    
+    // Check workspace limits
+    if (type === 'workspace' && userProfile?.role !== 'super_admin') {
+      const workspaceCount = sessions.filter(s => s.type === 'workspace' || !s.type).length;
+      const plan = userProfile?.plan || 'free';
+      
+      if (plan === 'free' && workspaceCount >= 1) {
+        toast.error('Free plan is limited to 1 workspace. Please upgrade to create more.');
+        if (currentSessionId) {
+          updateSession(currentSessionId, { mode: 'billing' });
+        }
+        return;
+      }
+      
+      if (plan === 'standard' && workspaceCount >= 5) {
+        toast.error('Standard plan is limited to 5 workspaces. Please upgrade to create more.');
+        if (currentSessionId) {
+          updateSession(currentSessionId, { mode: 'billing' });
+        }
+        return;
+      }
+    }
+
     const newSession: WorkspaceSession = {
       id: Date.now().toString(),
       title,
@@ -774,7 +847,7 @@ export default function App() {
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, `sessions/${newSession.id}`);
     }
-  }, [user]);
+  }, [user, userProfile, sessions, currentSessionId, updateSession]);
 
   const handleStartChat = useCallback(async (userId: string, userName: string, userPhoto?: string) => {
     if (!user) return;
@@ -824,15 +897,6 @@ export default function App() {
     }
   };
 
-  const updateSession = useCallback(async (id: string, updates: Partial<WorkspaceSession>) => {
-    if (!user) return;
-    try {
-      await updateDoc(doc(db, 'sessions', id), { ...updates, updatedAt: Date.now() });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `sessions/${id}`);
-    }
-  }, [user]);
-
   useEffect(() => {
     if (scrollRef.current && isAutoScrollEnabled) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -849,6 +913,10 @@ export default function App() {
 
   const handleTranslate = async (messageId: string, text: string, lang: string) => {
     if (!currentSessionId || !currentSession) return;
+    if (!checkUsageLimit(userProfile, 'translations')) {
+      toast.error('Translation limit reached for your plan. Please upgrade to translate more.');
+      return;
+    }
     try {
       const translatedContent = await translateText(text, lang);
       const updatedMessages = currentSession.messages.map(m => 
@@ -858,6 +926,7 @@ export default function App() {
         messages: updatedMessages,
         updatedAt: Date.now()
       });
+      await incrementUsage(userProfile, 'translations');
     } catch (error) {
       console.error("Translation error:", error);
     }
@@ -881,6 +950,10 @@ export default function App() {
 
   const handleGenerateSpeech = async (messageId: string, text: string) => {
     if (!currentSessionId || !currentSession) return;
+    if (!checkUsageLimit(userProfile, 'readouts')) {
+      toast.error('Readout limit reached for your plan. Please upgrade to generate more speech.');
+      return;
+    }
     try {
       const audioUrl = await generateSpeech(text, currentSession.ttsVoice || 'Kore');
       if (audioUrl) {
@@ -891,6 +964,7 @@ export default function App() {
           messages: updatedMessages,
           updatedAt: Date.now()
         });
+        await incrementUsage(userProfile, 'readouts');
       }
     } catch (error) {
       console.error("Speech generation error:", error);
@@ -943,7 +1017,25 @@ export default function App() {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
+    if (!files || !currentSession) return;
+
+    // Check file limits
+    if (userProfile?.role !== 'super_admin') {
+      const currentFileCount = currentSession.files?.length || 0;
+      const newFileCount = files.length;
+      const totalFiles = currentFileCount + pendingFiles.length + newFileCount;
+      const plan = userProfile?.plan || 'free';
+
+      if (plan === 'free' && totalFiles > 5) {
+        toast.error('Free plan is limited to 5 files per workspace. Please upgrade to upload more.');
+        return;
+      }
+
+      if (plan === 'standard' && totalFiles > 20) {
+        toast.error('Standard plan is limited to 20 files per workspace. Please upgrade to upload more.');
+        return;
+      }
+    }
 
     Array.from(files).forEach(file => {
       const reader = new FileReader();
@@ -1103,6 +1195,40 @@ export default function App() {
             messages: s.messages.map(m => m.id === botMessageId ? { ...m, content: fullText } : m)
           } : s));
         }
+        
+        if (c.functionCalls) {
+          for (const call of c.functionCalls) {
+            if (call.name === 'fetchTickets') {
+              const args = call.args as any;
+              const statusFilter = args.status;
+              const ticketId = args.ticketId;
+              
+              const mockTickets = [
+                { id: 'TKT-101', title: 'Login Issue', status: 'open', date: '2026-03-29', link: 'https://support.example.com/tickets/TKT-101' },
+                { id: 'TKT-102', title: 'Billing Question', status: 'closed', date: '2026-03-28', link: 'https://support.example.com/tickets/TKT-102' },
+                { id: 'TKT-103', title: 'Feature Request', status: 'pending', date: '2026-03-30', link: 'https://support.example.com/tickets/TKT-103' }
+              ];
+              
+              let filteredTickets = mockTickets;
+              if (statusFilter) {
+                filteredTickets = mockTickets.filter(t => t.status === statusFilter.toLowerCase());
+              }
+              if (ticketId) {
+                filteredTickets = mockTickets.filter(t => t.id === ticketId);
+              }
+              
+              const ticketInfo = filteredTickets.length > 0 
+                ? filteredTickets.map(t => `- [${t.id}](${t.link}) ${t.title} (Status: ${t.status})`).join('\n')
+                : 'No tickets found matching the criteria.';
+                
+              fullText += `\n\n**Ticket System Response:**\n${ticketInfo}`;
+              setSessions(prev => prev.map(s => s.id === currentSessionId ? {
+                ...s,
+                messages: s.messages.map(m => m.id === botMessageId ? { ...m, content: fullText } : m)
+              } : s));
+            }
+          }
+        }
       }
 
       // Final update to Firestore
@@ -1143,7 +1269,7 @@ export default function App() {
       role: 'user',
       senderId: user.uid,
       senderName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
-      senderPhoto: user.photoURL || undefined,
+      senderPhoto: user.photoURL || null,
       content: input,
       timestamp: Date.now(),
       files: pendingFiles,
@@ -1184,7 +1310,7 @@ export default function App() {
           role: 'user',
           senderId: user.uid,
           senderName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
-          senderPhoto: user.photoURL || undefined,
+          senderPhoto: user.photoURL || null,
           content: `Poll: ${question}`,
           timestamp: Date.now(),
           poll: {
@@ -1350,6 +1476,36 @@ export default function App() {
               if (session.mode !== 'canvas') {
                 updateSession(currentSessionId, { mode: 'canvas' });
               }
+            } else if (call.name === 'fetchTickets') {
+              const args = call.args as any;
+              const statusFilter = args.status;
+              const ticketId = args.ticketId;
+              
+              // Mock tickets for demonstration
+              const mockTickets = [
+                { id: 'TKT-101', title: 'Login Issue', status: 'open', date: '2026-03-29', link: 'https://support.example.com/tickets/TKT-101' },
+                { id: 'TKT-102', title: 'Billing Question', status: 'closed', date: '2026-03-28', link: 'https://support.example.com/tickets/TKT-102' },
+                { id: 'TKT-103', title: 'Feature Request', status: 'pending', date: '2026-03-30', link: 'https://support.example.com/tickets/TKT-103' }
+              ];
+              
+              let filteredTickets = mockTickets;
+              if (statusFilter) {
+                filteredTickets = mockTickets.filter(t => t.status === statusFilter.toLowerCase());
+              }
+              if (ticketId) {
+                filteredTickets = mockTickets.filter(t => t.id === ticketId);
+              }
+              
+              const ticketInfo = filteredTickets.length > 0 
+                ? filteredTickets.map(t => `- [${t.id}](${t.link}) ${t.title} (Status: ${t.status})`).join('\n')
+                : 'No tickets found matching the criteria.';
+                
+              assistantContent += `\n\n**Ticket System Response:**\n${ticketInfo}`;
+              
+              setSessions(prev => prev.map(s => s.id === currentSessionId ? {
+                ...s,
+                messages: s.messages.map(m => m.id === assistantMessageId ? { ...m, content: assistantContent } : m)
+              } : s));
             }
           }
         }
@@ -1562,6 +1718,10 @@ export default function App() {
   };
 
   const handleExportAudio = async (text: string) => {
+    if (!checkUsageLimit(userProfile, 'audios')) {
+      toast.error('Audio generation limit reached for your plan. Please upgrade to generate more audio.');
+      return;
+    }
     try {
       toast.info('Generating audio...');
       const audioUrl = await generateSpeech(text);
@@ -1570,12 +1730,17 @@ export default function App() {
       a.download = `voice-note-${Date.now()}.wav`;
       a.click();
       toast.success('Audio exported successfully');
+      await incrementUsage(userProfile, 'audios');
     } catch (error) {
       toast.error('Failed to export audio');
     }
   };
 
   const handleExportImageSketch = async (text: string) => {
+    if (!checkUsageLimit(userProfile, 'sketching')) {
+      toast.error('Sketching limit reached for your plan. Please upgrade to generate more sketches.');
+      return;
+    }
     try {
       toast.info('Generating image sketch...');
       const prompt = `Create a simple, clean sketch or diagram summarizing: ${text.substring(0, 200)}`;
@@ -1585,12 +1750,17 @@ export default function App() {
       a.download = `sketch-${Date.now()}.png`;
       a.click();
       toast.success('Image sketch exported successfully');
+      await incrementUsage(userProfile, 'sketching');
     } catch (error) {
       toast.error('Failed to export image sketch');
     }
   };
 
   const handleExportZip = async (text: string) => {
+    if (!checkUsageLimit(userProfile, 'exports')) {
+      toast.error('Export limit reached for your plan. Please upgrade to export more bundles.');
+      return;
+    }
     try {
       toast.info('Generating ZIP bundle...');
       const JSZip = (await import('jszip')).default;
@@ -1626,8 +1796,30 @@ export default function App() {
       a.click();
       URL.revokeObjectURL(url);
       toast.success('ZIP bundle exported successfully');
+      await incrementUsage(userProfile, 'exports');
     } catch (error) {
       toast.error('Failed to export ZIP bundle');
+    }
+  };
+
+  const handleDownload = async (url: string, filename: string) => {
+    if (!checkUsageLimit(userProfile, 'downloads')) {
+      toast.error('Download limit reached for your plan. Please upgrade to download more files.');
+      return;
+    }
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+      await incrementUsage(userProfile, 'downloads');
+    } catch (error) {
+      console.error('Download failed:', error);
+      toast.error('Failed to download file');
     }
   };
 
@@ -1640,13 +1832,78 @@ export default function App() {
   }
 
   if (!user) {
-    return <MobileLogin onLogin={handleLogin} />;
+    return (
+      <>
+        <MobileLogin onLogin={handleLogin} />
+        <Toaster position="top-right" />
+      </>
+    );
   }
 
   return (
     <ErrorBoundary>
       <div className="flex h-screen bg-zinc-50 overflow-hidden">
         {/* Global Search Overlay */}
+      <AnimatePresence>
+        {isLibraryModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+            onClick={() => setIsLibraryModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-zinc-900">Select from Library</h2>
+                <button
+                  onClick={() => setIsLibraryModalOpen(false)}
+                  className="p-2 text-zinc-400 hover:text-zinc-950 hover:bg-zinc-100 rounded-xl transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                {currentSession?.files && currentSession.files.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {currentSession.files.map(file => (
+                      <button
+                        key={file.id}
+                        onClick={() => {
+                          setPendingFiles(prev => [...prev, file]);
+                          setIsLibraryModalOpen(false);
+                        }}
+                        className="flex flex-col items-center gap-3 p-4 bg-zinc-50 rounded-2xl border border-zinc-100 hover:border-zinc-300 hover:bg-zinc-100 transition-all text-left"
+                      >
+                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-zinc-400 shadow-sm">
+                          {file.type.startsWith('image/') ? <ImageIcon className="w-6 h-6" /> : <FileText className="w-6 h-6" />}
+                        </div>
+                        <div className="w-full text-center">
+                          <div className="text-sm font-bold text-zinc-900 truncate">{file.name}</div>
+                          <div className="text-xs text-zinc-500">{(file.size / 1024).toFixed(1)} KB</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Folder className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-bold text-zinc-900 mb-2">No files in library</h3>
+                    <p className="text-zinc-500 text-sm">Upload files to this workspace first to share them.</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {isGlobalSearchOpen && (
           <motion.div
@@ -1773,26 +2030,26 @@ export default function App() {
               </div>
               
               {/* Presence Indicator */}
-              {activeUsers.length > 0 && (
+              {roomUsers.length > 0 && (
                 <>
                   <div className="h-4 w-px bg-zinc-200" />
                   <div className="flex -space-x-2 overflow-hidden">
-                    {activeUsers.map((u) => (
+                    {roomUsers.map((u) => (
                       <div 
-                        key={u.id}
+                        key={u.uid}
                         className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-zinc-100 flex items-center justify-center overflow-hidden"
-                        title={u.name}
+                        title={u.displayName}
                       >
-                        {u.avatar ? (
-                          <img src={u.avatar} alt={u.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                        {u.photoURL ? (
+                          <img src={u.photoURL} alt={u.displayName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
-                          <span className="text-[10px] font-bold text-zinc-400">{u.name.charAt(0)}</span>
+                          <span className="text-[10px] font-bold text-zinc-400">{(u.displayName || '?').charAt(0)}</span>
                         )}
                       </div>
                     ))}
                   </div>
                   <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest animate-pulse">
-                    {activeUsers.length} Online
+                    {roomUsers.length} Online
                   </span>
                 </>
               )}
@@ -1826,35 +2083,35 @@ export default function App() {
                         <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-2">Active Users</span>
                       </div>
                       <div className="max-h-60 overflow-y-auto custom-scrollbar p-1">
-                        {activeUsers.filter(u => u.name.toLowerCase().includes(userSearchQuery.toLowerCase())).length > 0 ? (
-                          activeUsers.filter(u => u.name.toLowerCase().includes(userSearchQuery.toLowerCase())).map(u => (
+                        {allUsers.filter(u => (u.displayName || u.name || '').toLowerCase().includes(userSearchQuery.toLowerCase())).length > 0 ? (
+                          allUsers.filter(u => (u.displayName || u.name || '').toLowerCase().includes(userSearchQuery.toLowerCase())).map(u => (
                             <button
-                              key={u.id}
+                              key={u.uid || u.id}
                               onClick={() => {
                                 setIsUserSearchOpen(false);
                                 setUserSearchQuery('');
                                 // Check if direct chat already exists
-                                const existingSession = sessions.find(s => s.type === 'direct' && s.members?.includes(u.id));
+                                const existingSession = sessions.find(s => s.type === 'direct' && s.members?.includes(u.uid || u.id));
                                 if (existingSession) {
                                   setCurrentSessionId(existingSession.id);
                                 } else {
-                                  handleNewSession('direct', u.name, [u.id]);
+                                  handleNewSession('direct', u.displayName || u.name, [u.uid || u.id]);
                                 }
                               }}
                               className="w-full flex items-center gap-3 p-2 hover:bg-zinc-50 rounded-xl transition-all text-left"
                             >
                               <div className="relative">
                                 <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center overflow-hidden">
-                                  {u.avatar ? (
-                                    <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                  {u.photoURL || u.avatar ? (
+                                    <img src={u.photoURL || u.avatar} alt={u.displayName || u.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                   ) : (
-                                    <span className="text-xs font-bold text-zinc-400">{u.name.charAt(0)}</span>
+                                    <span className="text-xs font-bold text-zinc-400">{(u.displayName || u.name || '?').charAt(0)}</span>
                                   )}
                                 </div>
                                 <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
                               </div>
                               <div className="flex flex-col min-w-0">
-                                <span className="text-sm font-medium text-zinc-900 truncate">{u.name}</span>
+                                <span className="text-sm font-medium text-zinc-900 truncate">{u.displayName || u.name}</span>
                                 <span className="text-[10px] text-emerald-500 font-medium">Active now</span>
                               </div>
                             </button>
@@ -1988,7 +2245,13 @@ export default function App() {
 
               {user ? (
                 <div className="flex items-center gap-3 mr-2">
-                  <img src={user.photoURL || ''} alt="" className="w-6 h-6 rounded-full border border-zinc-200" />
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt="" className="w-6 h-6 rounded-full border border-zinc-200" />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full border border-zinc-200 bg-zinc-100 flex items-center justify-center text-[10px] font-bold text-zinc-500">
+                      {(user.displayName || user.email || 'U')[0].toUpperCase()}
+                    </div>
+                  )}
                   <button onClick={handleLogout} className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-red-500 transition-colors">Logout</button>
                 </div>
               ) : (
@@ -2040,32 +2303,62 @@ export default function App() {
           {/* Main Content Area */}
           <div className="flex-1 overflow-hidden flex flex-col relative">
             {currentSession?.mode === 'document' ? (
-              <DocumentEditor 
-                data={currentSession.documentData || ''} 
-                onSave={handleSaveDocument}
-                onAIAction={handleDocumentAIAction}
-                presence={currentSession.presence}
-                sessionId={currentSessionId || ''}
-                versions={currentSession.documentVersions}
-                onRevert={handleRevertVersion}
-                templates={templates}
-                onSaveTemplate={handleSaveTemplate}
-                onDeleteTemplate={handleDeleteTemplate}
-              />
+              userProfile?.role === 'super_admin' || ['standard', 'advanced', 'corporate'].includes(userProfile?.plan || 'free') ? (
+                <DocumentEditor 
+                  data={currentSession.documentData || ''} 
+                  onSave={handleSaveDocument}
+                  onAIAction={handleDocumentAIAction}
+                  presence={roomUsers.reduce((acc, u) => ({...acc, [u.uid || u.id]: { uid: u.uid || u.id, displayName: u.displayName || u.name, photoURL: u.photoURL || u.avatar, lastActive: Date.now(), status: 'online' }}), {})}
+                  sessionId={currentSessionId || ''}
+                  versions={currentSession.documentVersions}
+                  onRevert={handleRevertVersion}
+                  templates={templates}
+                  onSaveTemplate={handleSaveTemplate}
+                  onDeleteTemplate={handleDeleteTemplate}
+                />
+              ) : (
+                <div className="flex-1 flex items-center justify-center p-12 text-center">
+                  <div className="max-w-md">
+                    <h3 className="text-2xl font-bold mb-4">Upgrade Required</h3>
+                    <p className="text-zinc-500 mb-6">The Document Editor requires the Standard plan or higher.</p>
+                    <button onClick={() => updateSession(currentSessionId!, { mode: 'billing' })} className="px-6 py-3 bg-zinc-950 text-white rounded-xl font-medium hover:bg-zinc-800">View Plans</button>
+                  </div>
+                </div>
+              )
             ) : currentSession?.mode === 'media' ? (
-              <MediaHub 
-                onSaveToLibrary={(file) => {
-                  if (!currentSessionId || !currentSession) return;
-                  const newFiles = [...(currentSession.files || []), { ...file, id: Math.random().toString(36).substr(2, 9), timestamp: Date.now() }];
-                  updateSession(currentSessionId, { files: newFiles });
-                }}
-              />
+              userProfile?.role === 'super_admin' || ['advanced', 'corporate'].includes(userProfile?.plan || 'free') ? (
+                <MediaHub 
+                  onSaveToLibrary={(file) => {
+                    if (!currentSessionId || !currentSession) return;
+                    const newFiles = [...(currentSession.files || []), { ...file, id: Math.random().toString(36).substr(2, 9), timestamp: Date.now() }];
+                    updateSession(currentSessionId, { files: newFiles });
+                  }}
+                />
+              ) : (
+                <div className="flex-1 flex items-center justify-center p-12 text-center">
+                  <div className="max-w-md">
+                    <h3 className="text-2xl font-bold mb-4">Upgrade Required</h3>
+                    <p className="text-zinc-500 mb-6">The Media Hub requires the Advanced plan or higher.</p>
+                    <button onClick={() => updateSession(currentSessionId!, { mode: 'billing' })} className="px-6 py-3 bg-zinc-950 text-white rounded-xl font-medium hover:bg-zinc-800">View Plans</button>
+                  </div>
+                </div>
+              )
             ) : currentSession?.mode === 'canvas' ? (
-              <Canvas 
-                data={currentSession.canvasData} 
-                onSave={(canvasData) => currentSessionId && updateSession(currentSessionId, { canvasData })} 
-                sessionId={currentSessionId || ''}
-              />
+              userProfile?.role === 'super_admin' || ['advanced', 'corporate'].includes(userProfile?.plan || 'free') ? (
+                <Canvas 
+                  data={currentSession.canvasData} 
+                  onSave={(canvasData) => currentSessionId && updateSession(currentSessionId, { canvasData })} 
+                  sessionId={currentSessionId || ''}
+                />
+              ) : (
+                <div className="flex-1 flex items-center justify-center p-12 text-center">
+                  <div className="max-w-md">
+                    <h3 className="text-2xl font-bold mb-4">Upgrade Required</h3>
+                    <p className="text-zinc-500 mb-6">The Visual Canvas requires the Advanced plan or higher.</p>
+                    <button onClick={() => updateSession(currentSessionId!, { mode: 'billing' })} className="px-6 py-3 bg-zinc-950 text-white rounded-xl font-medium hover:bg-zinc-800">View Plans</button>
+                  </div>
+                </div>
+              )
             ) : currentSession?.mode === 'library' ? (
               <Library 
                 files={currentSession.files || []} 
@@ -2087,6 +2380,7 @@ export default function App() {
                 currentUserId={user?.uid || ''}
                 onToggleBotInSession={handleToggleBotInSession}
                 activeBotsInSession={currentSession?.agentUnits || []}
+                userProfile={userProfile}
               />
             ) : currentSession?.mode === 'settings' ? (
               <Settings 
@@ -2099,6 +2393,23 @@ export default function App() {
                 onClearChat={clearChat}
                 onExportSession={exportWorkspace}
               />
+            ) : currentSession?.mode === 'billing' ? (
+              <div className="flex-1 overflow-y-auto p-6 md:p-12 bg-zinc-50">
+                <div className="max-w-6xl mx-auto">
+                  <div className="mb-12">
+                    <h2 className="text-4xl font-black text-zinc-950 tracking-tighter uppercase mb-2">Plans & Billing</h2>
+                    <p className="text-zinc-500 font-medium text-lg">Manage your subscription and unlock powerful features.</p>
+                  </div>
+                  {userProfile && (
+                    <Billing 
+                      userProfile={userProfile} 
+                      onPlanUpdate={(plan) => {
+                        toast.success(`Successfully upgraded to ${plan} plan!`);
+                      }} 
+                    />
+                  )}
+                </div>
+              </div>
             ) : (
               /* Chat Area */
               <div 
@@ -2172,6 +2483,7 @@ export default function App() {
                       onExportAudio={(text) => handleExportAudio(text)}
                       onExportImageSketch={(text) => handleExportImageSketch(text)}
                       onExportZip={(text) => handleExportZip(text)}
+                      onDownload={handleDownload}
                     />
                   </motion.div>
                 ))}
@@ -2409,14 +2721,76 @@ export default function App() {
                     className="hidden" 
                     multiple
                   />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={!currentSession || isLoading}
-                    className="p-2.5 text-zinc-400 hover:text-zinc-950 transition-all rounded-xl hover:bg-white disabled:opacity-50"
-                    title="Attach Files"
-                  >
-                    <Paperclip className="w-5 h-5" />
-                  </button>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
+                      disabled={!currentSession || isLoading}
+                      className="p-2.5 text-zinc-400 hover:text-zinc-950 transition-all rounded-xl hover:bg-white disabled:opacity-50"
+                      title="Add Emoji"
+                    >
+                      <Smile className="w-5 h-5" />
+                    </button>
+                    <AnimatePresence>
+                      {isEmojiPickerOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                          className="absolute bottom-full right-0 mb-2 z-50"
+                        >
+                          <EmojiPicker
+                            onEmojiClick={(emojiData) => {
+                              setInput(prev => prev + emojiData.emoji);
+                              setIsEmojiPickerOpen(false);
+                            }}
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsAttachmentMenuOpen(!isAttachmentMenuOpen)}
+                      disabled={!currentSession || isLoading}
+                      className="p-2.5 text-zinc-400 hover:text-zinc-950 transition-all rounded-xl hover:bg-white disabled:opacity-50"
+                      title="Attach Files"
+                    >
+                      <Paperclip className="w-5 h-5" />
+                    </button>
+                    <AnimatePresence>
+                      {isAttachmentMenuOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                          className="absolute bottom-full right-0 mb-2 w-48 bg-white rounded-2xl shadow-xl border border-zinc-100 overflow-hidden z-50"
+                        >
+                          <button
+                            onClick={() => {
+                              setIsAttachmentMenuOpen(false);
+                              fileInputRef.current?.click();
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950 transition-colors text-left"
+                          >
+                            <ImageIcon className="w-4 h-4" />
+                            From Computer
+                          </button>
+                          <button
+                            onClick={() => {
+                              setIsAttachmentMenuOpen(false);
+                              setIsLibraryModalOpen(true);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950 transition-colors text-left border-t border-zinc-100"
+                          >
+                            <Folder className="w-4 h-4" />
+                            From Library
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
                 <button
                   onClick={handleSend}

@@ -21,7 +21,8 @@ import {
   MapPin,
   Upload,
   UserPlus,
-  User
+  User,
+  Ticket
 } from 'lucide-react';
 import { Bot, Message, AIModel } from '../types';
 import { db, collection, onSnapshot, query, where, doc, setDoc, deleteDoc } from '../firebase';
@@ -35,13 +36,16 @@ import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-markdown';
 import 'prismjs/themes/prism-tomorrow.css';
 
+import { toast } from 'sonner';
+
 interface BotPlatformProps {
   currentUserId: string;
   onToggleBotInSession: (bot: Bot) => void;
   activeBotsInSession: Bot[];
+  userProfile?: any;
 }
 
-export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInSession }: BotPlatformProps) {
+export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInSession, userProfile }: BotPlatformProps) {
   const [bots, setBots] = useState<Bot[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [editingBotId, setEditingBotId] = useState<string | null>(null);
@@ -75,7 +79,8 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
     { id: 'image_generation', name: 'Image Generation', icon: ImageIcon, description: 'Generate high-quality visuals' },
     { id: 'web_search', name: 'Web Search', icon: Globe, description: 'Access real-time information' },
     { id: 'maps', name: 'Google Maps', icon: MapPin, description: 'Location and place data' },
-    { id: 'video_generation', name: 'Video Generation', icon: Video, description: 'Create short cinematic clips' }
+    { id: 'video_generation', name: 'Video Generation', icon: Video, description: 'Create short cinematic clips' },
+    { id: 'fetch_tickets', name: 'Fetch Tickets', icon: Ticket, description: 'Access support ticket database' }
   ];
 
   const botTemplates: Bot[] = [
@@ -85,7 +90,7 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
       username: '@support_pro',
       description: 'Automated customer support specialist with empathy and problem-solving skills.',
       systemInstruction: 'You are a helpful and empathetic customer support representative. Your goal is to resolve user issues efficiently while maintaining a professional and friendly tone. Always ask clarifying questions if the problem is unclear. If you cannot solve a problem, offer to escalate it to a human agent.',
-      tools: ['web_search'],
+      tools: ['web_search', 'fetch_tickets'],
       commands: [
         { command: 'status', description: 'Check ticket status', action: 'Fetch ticket status from database' },
         { command: 'faq', description: 'Search frequent questions', action: 'Search knowledge base' }
@@ -237,6 +242,22 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
   }, []);
 
   const handleCreateBot = async () => {
+    // Check bot limits
+    if (!editingBotId && userProfile?.role !== 'super_admin') {
+      const myBotsCount = bots.filter(b => b.creatorId === currentUserId).length;
+      const plan = userProfile?.plan || 'free';
+      
+      if (plan === 'free' && myBotsCount >= 1) {
+        toast.error('Free plan is limited to 1 bot. Please upgrade to create more.');
+        return;
+      }
+      
+      if (plan === 'standard' && myBotsCount >= 3) {
+        toast.error('Standard plan is limited to 3 bots. Please upgrade to create more.');
+        return;
+      }
+    }
+
     const newErrors: { [key: string]: string } = {};
     if (!newBot.name) newErrors.name = 'Bot name is required';
     if (!newBot.username) newErrors.username = 'Username is required';
@@ -314,6 +335,7 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
     setNewBot({
       ...newBot,
       name: template.name,
+      username: template.username,
       description: template.description,
       systemInstruction: template.systemInstruction,
       modelId: template.modelId || 'gemini-3-flash-preview',
@@ -364,10 +386,45 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
       let fullText = '';
       for await (const chunk of responseStream) {
         const c = chunk as any;
-        fullText += c.text || '';
-        setTestMessages(prev => prev.map(m => 
-          m.id === assistantMsgId ? { ...m, content: fullText } : m
-        ));
+        if (c.text) {
+          fullText += c.text;
+          setTestMessages(prev => prev.map(m => 
+            m.id === assistantMsgId ? { ...m, content: fullText } : m
+          ));
+        }
+        
+        if (c.functionCalls) {
+          for (const call of c.functionCalls) {
+            if (call.name === 'fetchTickets') {
+              const args = call.args as any;
+              const statusFilter = args.status;
+              const ticketId = args.ticketId;
+              
+              const mockTickets = [
+                { id: 'TKT-101', title: 'Login Issue', status: 'open', date: '2026-03-29', link: 'https://support.example.com/tickets/TKT-101' },
+                { id: 'TKT-102', title: 'Billing Question', status: 'closed', date: '2026-03-28', link: 'https://support.example.com/tickets/TKT-102' },
+                { id: 'TKT-103', title: 'Feature Request', status: 'pending', date: '2026-03-30', link: 'https://support.example.com/tickets/TKT-103' }
+              ];
+              
+              let filteredTickets = mockTickets;
+              if (statusFilter) {
+                filteredTickets = mockTickets.filter(t => t.status === statusFilter.toLowerCase());
+              }
+              if (ticketId) {
+                filteredTickets = mockTickets.filter(t => t.id === ticketId);
+              }
+              
+              const ticketInfo = filteredTickets.length > 0 
+                ? filteredTickets.map(t => `- [${t.id}](${t.link}) ${t.title} (Status: ${t.status})`).join('\n')
+                : 'No tickets found matching the criteria.';
+                
+              fullText += `\n\n**Ticket System Response:**\n${ticketInfo}`;
+              setTestMessages(prev => prev.map(m => 
+                m.id === assistantMsgId ? { ...m, content: fullText } : m
+              ));
+            }
+          }
+        }
       }
 
       setTestMessages(prev => prev.map(m => 

@@ -35,12 +35,16 @@ async function startServer() {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
-    socket.on("join-room", ({ roomId, user }) => {
+    socket.on("join-room", ({ roomId, user, initialState }) => {
       socket.join(roomId);
-      console.log(`User ${user.name} joined room ${roomId}`);
+      console.log(`User ${user.displayName || user.name} joined room ${roomId}`);
 
       if (!rooms.has(roomId)) {
-        rooms.set(roomId, { users: new Map(), canvas: [], doc: "" });
+        rooms.set(roomId, { 
+          users: new Map(), 
+          canvas: initialState?.canvas || { lines: [], shapes: [] }, 
+          doc: initialState?.doc || "" 
+        });
       }
       
       const room = rooms.get(roomId);
@@ -51,6 +55,20 @@ async function startServer() {
       
       // Send initial state to the new user
       socket.emit("init-state", { canvas: room.canvas, doc: room.doc });
+    });
+
+    socket.on("leave-room", ({ roomId }) => {
+      socket.leave(roomId);
+      const room = rooms.get(roomId);
+      if (room && room.users.has(socket.id)) {
+        const user = room.users.get(socket.id);
+        console.log(`User ${user.displayName || user.name} left room ${roomId}`);
+        room.users.delete(socket.id);
+        io.to(roomId).emit("presence-update", Array.from(room.users.values()));
+        if (room.users.size === 0) {
+          rooms.delete(roomId);
+        }
+      }
     });
 
     socket.on("cursor-move", ({ roomId, cursor, position }) => {

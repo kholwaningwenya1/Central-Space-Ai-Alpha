@@ -39,6 +39,13 @@ export function Canvas({ data, onSave, sessionId }: CanvasProps) {
   // Socket listeners
   useEffect(() => {
     if (socket && isConnected) {
+      socket.on('init-state', (state: any) => {
+        if (state && state.canvas) {
+          setLines(state.canvas.lines || []);
+          setShapes(state.canvas.shapes || []);
+        }
+      });
+
       socket.on('canvas-sync', (elements: any) => {
         setLines(elements.lines || []);
         setShapes(elements.shapes || []);
@@ -63,6 +70,7 @@ export function Canvas({ data, onSave, sessionId }: CanvasProps) {
       });
 
       return () => {
+        socket.off('init-state');
         socket.off('canvas-sync');
         socket.off('cursor-update');
         socket.off('presence-update');

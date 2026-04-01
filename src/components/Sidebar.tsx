@@ -23,7 +23,8 @@ import {
   Hash,
   Users2,
   UserPlus,
-  Bot as BotIcon
+  Bot as BotIcon,
+  CreditCard
 } from 'lucide-react';
 import { Tone, Voice, AIModel, WorkspaceSession, SessionMode, Presence, ConversationType, ResultType } from '../types';
 import { cn } from '../lib/utils';
@@ -53,19 +54,21 @@ interface SidebarProps {
   onNewSession: (type?: ConversationType, title?: string, members?: string[]) => void;
   user: FirebaseUser | null;
   presence?: { [uid: string]: Presence };
+  userProfile?: any;
 }
 
-const MODELS: { id: AIModel; name: string; provider: string; description: string }[] = [
-  { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', provider: 'Google', description: 'Most capable model for complex reasoning' },
+const MODELS: { id: AIModel; name: string; provider: string; description: string; minPlan?: string }[] = [
+  { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', provider: 'Google', description: 'Most capable model for complex reasoning', minPlan: 'standard' },
   { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash', provider: 'Google', description: 'Fast and efficient for daily tasks' },
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', description: 'Balanced performance and speed' },
-  { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI', description: 'High-intelligence flagship model' },
+  { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI', description: 'High-intelligence flagship model', minPlan: 'standard' },
   { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'OpenAI', description: 'Fast, affordable small model' },
-  { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'Anthropic', description: 'Excellent for coding and nuance' },
-  { id: 'claude-3-opus', name: 'Claude 3 Opus', provider: 'Anthropic', description: 'Powerful model for complex tasks' },
+  { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'Anthropic', description: 'Excellent for coding and nuance', minPlan: 'advanced' },
+  { id: 'claude-3-opus', name: 'Claude 3 Opus', provider: 'Anthropic', description: 'Powerful model for complex tasks', minPlan: 'advanced' },
 ];
 
 import { GoogleGenAI } from "@google/genai";
+import { toast } from 'sonner';
 
 export function Sidebar({ 
   currentTone, 
@@ -89,11 +92,42 @@ export function Sidebar({
   onSessionSelect,
   onNewSession,
   user,
-  presence
+  presence,
+  userProfile
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [summary, setSummary] = React.useState<string | null>(null);
   const [isSummarizing, setIsSummarizing] = React.useState(false);
+
+  const checkPlanAccess = (requiredPlan: string) => {
+    if (!userProfile) return false;
+    if (userProfile.role === 'super_admin') return true;
+    
+    const plans = ['free', 'standard', 'advanced', 'corporate'];
+    const userPlanIndex = plans.indexOf(userProfile.plan || 'free');
+    const requiredPlanIndex = plans.indexOf(requiredPlan);
+    
+    return userPlanIndex >= requiredPlanIndex;
+  };
+
+  const handleModeClick = (modeId: SessionMode, requiredPlan?: string) => {
+    if (requiredPlan && !checkPlanAccess(requiredPlan)) {
+      toast.error(`This feature requires the ${requiredPlan.charAt(0).toUpperCase() + requiredPlan.slice(1)} plan or higher.`);
+      onModeChange('billing');
+      return;
+    }
+    onModeChange(modeId);
+  };
+
+  const handleModelChange = (modelId: AIModel) => {
+    const model = MODELS.find(m => m.id === modelId);
+    if (model?.minPlan && !checkPlanAccess(model.minPlan)) {
+      toast.error(`The ${model.name} model requires the ${model.minPlan.charAt(0).toUpperCase() + model.minPlan.slice(1)} plan or higher.`);
+      onModeChange('billing');
+      return;
+    }
+    onModelChange(modelId);
+  };
 
   const filteredSessions = sessions
     .filter(s => s.title?.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -199,17 +233,18 @@ export function Sidebar({
           )}
           {[
             { id: 'chat', icon: MessageSquare, label: 'Chat & Research' },
-            { id: 'media', icon: Sparkles, label: 'Media Hub' },
+            { id: 'media', icon: Sparkles, label: 'Media Hub', requiredPlan: 'advanced' },
             { id: 'directory', icon: UserPlus, label: 'Directory' },
             { id: 'bots', icon: BotIcon, label: 'Bot Platform' },
-            { id: 'document', icon: FileText, label: 'Document Editor' },
-            { id: 'canvas', icon: Palette, label: 'Visual Canvas' },
+            { id: 'document', icon: FileText, label: 'Document Editor', requiredPlan: 'standard' },
+            { id: 'canvas', icon: Palette, label: 'Visual Canvas', requiredPlan: 'advanced' },
             { id: 'library', icon: LibraryIcon, label: 'File Library' },
             { id: 'settings', icon: Settings, label: 'Settings' },
+            { id: 'billing', icon: CreditCard, label: 'Billing & Plans' },
           ].map((mode) => (
             <button
               key={mode.id}
-              onClick={() => onModeChange(mode.id as SessionMode)}
+              onClick={() => handleModeClick(mode.id as SessionMode, mode.requiredPlan)}
               className={cn(
                 "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group",
                 currentMode === mode.id 

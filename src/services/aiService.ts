@@ -38,6 +38,24 @@ const MODIFY_CANVAS_TOOL: FunctionDeclaration = {
   }
 };
 
+const FETCH_TICKETS_TOOL: FunctionDeclaration = {
+  name: "fetchTickets",
+  description: "Fetch support tickets from the database. Use this when a user asks about their ticket status or wants to see their tickets.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      status: {
+        type: Type.STRING,
+        description: "Filter tickets by status (e.g., 'open', 'closed', 'pending'). Optional.",
+      },
+      ticketId: {
+        type: Type.STRING,
+        description: "Fetch a specific ticket by its ID. Optional.",
+      }
+    }
+  }
+};
+
 const SYSTEM_INSTRUCTION_BASE = `You are Central Space AI, an all‑in‑one workspace assistant for research, document creation, coding, data analysis, and media generation. Your primary goal is to help the user think, create, and iterate efficiently inside a single central space.
 
 ### Core Capabilities
@@ -87,10 +105,11 @@ export async function orchestrateAgentUnits(
   const activeUnits = units.filter(u => u.isActive);
   if (activeUnits.length === 0) return { discussion: [], context: "" };
 
-  if (!process.env.GEMINI_API_KEY) {
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
     throw new Error('Gemini API key is missing. Please check your configuration.');
   }
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
   // 1. Planning Step: Ask the model which units are relevant
   const planningPrompt = `Given the user request: "${prompt}"
@@ -187,10 +206,11 @@ export async function generateChatResponseStream(
     return { responseStream: fakeStream, agentDiscussion: disc };
   }
 
-  if (!process.env.GEMINI_API_KEY) {
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
     throw new Error('Gemini API key is missing. Please check your configuration.');
   }
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
   const isGemini25 = settings.modelId.includes('gemini-2.5');
   
@@ -244,13 +264,19 @@ export async function generateChatResponseStream(
     if (settings.customTools.includes('web_search')) tools.push({ googleSearch: {} });
     if (settings.customTools.includes('maps')) tools.push({ googleMaps: {} });
   } else {
-    tools.push({ googleSearch: {} });
-    if (isGemini25) {
+    if (settings.searchEnabled) {
+      tools.push({ googleSearch: {} });
+    }
+    if (isGemini25 && !settings.searchEnabled) {
       tools.push({ googleMaps: {} });
     }
   }
   
-  tools.push({ functionDeclarations: [MODIFY_CANVAS_TOOL] });
+  const functionDeclarations = [MODIFY_CANVAS_TOOL];
+  if (settings.customTools?.includes('fetch_tickets')) {
+    functionDeclarations.push(FETCH_TICKETS_TOOL);
+  }
+  tools.push({ functionDeclarations });
 
   const config: any = {
     systemInstruction: systemInstruction,
@@ -318,10 +344,11 @@ export async function generateChatResponse(
     return { text: data.text, sources: data.sources || [], agentDiscussion };
   }
 
-  if (!process.env.GEMINI_API_KEY) {
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
     throw new Error('Gemini API key is missing. Please check your configuration.');
   }
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
   const isGemini25 = settings.modelId.includes('gemini-2.5');
 
@@ -374,13 +401,19 @@ export async function generateChatResponse(
     if (settings.customTools.includes('web_search')) tools.push({ googleSearch: {} });
     if (settings.customTools.includes('maps')) tools.push({ googleMaps: {} });
   } else {
-    tools.push({ googleSearch: {} });
-    if (isGemini25) {
+    if (settings.searchEnabled) {
+      tools.push({ googleSearch: {} });
+    }
+    if (isGemini25 && !settings.searchEnabled) {
       tools.push({ googleMaps: {} });
     }
   }
   
-  tools.push({ functionDeclarations: [MODIFY_CANVAS_TOOL] });
+  const functionDeclarations = [MODIFY_CANVAS_TOOL];
+  if (settings.customTools?.includes('fetch_tickets')) {
+    functionDeclarations.push(FETCH_TICKETS_TOOL);
+  }
+  tools.push({ functionDeclarations });
 
   const config: any = {
     systemInstruction: systemInstruction,
@@ -433,10 +466,11 @@ export async function generateChatResponse(
 }
 
 export async function transcribeAudio(audioBase64: string, mimeType: string) {
-  if (!process.env.GEMINI_API_KEY) {
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
     throw new Error('Gemini API key is missing. Please check your configuration.');
   }
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -452,10 +486,11 @@ export async function transcribeAudio(audioBase64: string, mimeType: string) {
 }
 
 export async function translateText(text: string, targetLanguage: string) {
-  if (!process.env.GEMINI_API_KEY) {
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
     throw new Error('Gemini API key is missing. Please check your configuration.');
   }
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -569,10 +604,11 @@ export async function generateVideoFromPrompt(
 }
 
 export async function enhancePrompt(prompt: string, type: 'image' | 'video') {
-  if (!process.env.GEMINI_API_KEY) {
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
     throw new Error('Gemini API key is missing. Please check your configuration.');
   }
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
   const systemInstruction = `You are a prompt engineering expert for ${type} generation models. 
   Your goal is to take a simple user prompt and expand it into a detailed, descriptive, and high-quality prompt that will produce stunning results.
@@ -590,10 +626,11 @@ export async function enhancePrompt(prompt: string, type: 'image' | 'video') {
 }
 
 export async function generateImageFromPrompt(prompt: string, config?: { aspectRatio?: "1:1" | "3:4" | "4:3" | "9:16" | "16:9" }) {
-  if (!process.env.GEMINI_API_KEY) {
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
     throw new Error('Gemini API key is missing. Please check your configuration.');
   }
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
@@ -614,10 +651,11 @@ export async function generateImageFromPrompt(prompt: string, config?: { aspectR
 }
 
 export async function generateSpeech(text: string, voiceName: string = 'Kore'): Promise<string | null> {
-  if (!process.env.GEMINI_API_KEY) {
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
     throw new Error('Gemini API key is missing. Please check your configuration.');
   }
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
@@ -684,10 +722,11 @@ export async function generateSpeech(text: string, voiceName: string = 'Kore'): 
 }
 
 export async function findYouTubeLinks(topic: string): Promise<string> {
-  if (!process.env.GEMINI_API_KEY) {
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
     throw new Error('Gemini API key is missing. Please check your configuration.');
   }
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",

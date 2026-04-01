@@ -15,15 +15,26 @@ export type ConversationType = 'direct' | 'group' | 'channel' | 'workspace';
 export type UserRole = 'super_admin' | 'admin' | 'support' | 'user';
 export type SubscriptionPlan = 'free' | 'standard' | 'advanced' | 'corporate';
 
+export interface DailyUsage {
+  date: string; // YYYY-MM-DD
+  translations: number;
+  audios: number;
+  readouts: number;
+  sketching: number;
+  exports: number;
+  downloads: number;
+}
+
 export interface UserProfile {
   uid: string;
   email: string;
   displayName: string;
-  photoURL?: string;
+  photoURL?: string | null;
   role: UserRole;
   plan: SubscriptionPlan;
   isWhitelisted: boolean;
   isSuperAdminModeActive?: boolean;
+  dailyUsage?: DailyUsage;
   createdAt: number;
   updatedAt: number;
 }
@@ -85,7 +96,7 @@ export interface Reaction {
 export interface Presence {
   uid: string;
   displayName: string;
-  photoURL?: string;
+  photoURL?: string | null;
   lastActive: number;
   status?: 'online' | 'away' | 'busy' | 'offline';
   cursor?: { x: number; y: number };
@@ -96,7 +107,7 @@ export interface Message {
   role: 'user' | 'assistant' | 'system' | 'bot';
   senderId?: string;
   senderName?: string;
-  senderPhoto?: string;
+  senderPhoto?: string | null;
   botId?: string;
   content: string;
   timestamp: number;

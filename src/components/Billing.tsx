@@ -16,28 +16,28 @@ const PLANS = [
     name: 'Free',
     price: 0,
     description: 'Perfect for getting started',
-    features: ['Basic chat', '1 Workspace', 'Limited bots', 'Standard AI models']
+    features: ['Basic chat & Unlimited Reactions', '1 Workspace', '1 Translation/day', '1 Audio Generation/day', '1 Sketch/day', '1 Export & Download/day']
   },
   {
     id: 'standard' as SubscriptionPlan,
     name: 'Standard',
     price: 9.99,
     description: 'For power users',
-    features: ['Unlimited chat', '5 Workspaces', 'Custom bots', 'Document editor', 'Advanced AI models']
+    features: ['Unlimited chat', '5 Workspaces', '20 Translations/day', '20 Audios & Sketches/day', '20 Exports & Downloads/day', 'Document editor & Custom bots']
   },
   {
     id: 'advanced' as SubscriptionPlan,
     name: 'Advanced',
     price: 19.99,
     description: 'The complete experience',
-    features: ['Unlimited workspaces', 'Visual canvas', 'Media hub', 'Priority AI access', 'Custom tools']
+    features: ['Unlimited workspaces', '60 Translations/day', '60 Audios & Sketches/day', '60 Exports & Downloads/day', 'Visual canvas & Media hub', 'Custom tools']
   },
   {
     id: 'corporate' as SubscriptionPlan,
     name: 'Corporate',
     price: 49.99,
     description: 'For teams and organizations',
-    features: ['Everything in Advanced', 'Priority support', 'Whitelisting', 'Custom domain', 'Dedicated resources']
+    features: ['Unlimited everything', 'Priority support', 'Whitelisting', 'Custom domain', 'Dedicated resources']
   }
 ];
 

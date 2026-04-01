@@ -64,10 +64,6 @@ export function DocumentEditor({
   const { socket, isConnected } = useSocket();
   const grammarTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    setContent(data || '');
-  }, [data]);
-
   // Real-time Grammar Check (Debounced)
   useEffect(() => {
     if (grammarTimeoutRef.current) clearTimeout(grammarTimeoutRef.current);
@@ -98,9 +94,14 @@ export function DocumentEditor({
     };
   }, [content, viewMode]);
 
-  // Socket listeners
   useEffect(() => {
     if (socket && isConnected) {
+      socket.on('init-state', (state: any) => {
+        if (state && typeof state.doc === 'string') {
+          setContent(state.doc);
+        }
+      });
+
       socket.on('doc-sync', (newContent: string) => {
         setContent(newContent);
       });
@@ -113,6 +114,7 @@ export function DocumentEditor({
       });
 
       return () => {
+        socket.off('init-state');
         socket.off('doc-sync');
         socket.off('cursor-update');
       };
@@ -584,7 +586,21 @@ export function DocumentEditor({
                             <div className="text-sm text-red-500 line-through mb-2">{s.original}</div>
                             <div className="text-[10px] font-bold text-zinc-400 uppercase mb-1">Suggestion</div>
                             <div className="text-sm text-emerald-600 font-medium mb-2">{s.suggestion}</div>
-                            <div className="text-[10px] italic text-zinc-400">{s.reason}</div>
+                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-zinc-200/50">
+                              <div className="text-[10px] italic text-zinc-500 flex-1 pr-2 leading-tight">{s.reason}</div>
+                              <button
+                                onClick={() => {
+                                  const newContent = content.replace(s.original, s.suggestion);
+                                  setContent(newContent);
+                                  onSave(newContent);
+                                  emitDocUpdate(newContent);
+                                  setGrammarSuggestions(prev => prev.filter((_, idx) => idx !== i));
+                                }}
+                                className="px-3 py-1.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-wider rounded-lg hover:bg-emerald-200 transition-colors shrink-0"
+                              >
+                                Apply
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
