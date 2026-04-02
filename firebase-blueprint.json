@@ -42,7 +42,8 @@
         "senderName": { "type": "string" },
         "senderAvatar": { "type": "string" },
         "poll": { "$ref": "Poll" },
-        "reactions": { "type": "array", "items": { "$ref": "Reaction" } }
+        "reactions": { "type": "array", "items": { "$ref": "Reaction" } },
+        "dueDate": { "type": "integer", "description": "Optional due date for the message" }
       },
       "required": ["id", "role", "content", "timestamp"]
     },
@@ -76,7 +77,9 @@
         "avatar": { "type": "string" },
         "creatorId": { "type": "string" },
         "isActive": { "type": "boolean" },
-        "createdAt": { "type": "integer" }
+        "createdAt": { "type": "integer" },
+        "category": { "type": "string", "description": "The niche or category of the bot" },
+        "tone": { "type": "string", "description": "The tone of voice of the bot" }
       },
       "required": ["id", "name", "username", "systemInstruction", "creatorId", "isActive", "createdAt"]
     },

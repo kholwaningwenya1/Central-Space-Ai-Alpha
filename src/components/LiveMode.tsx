@@ -24,10 +24,11 @@ export function LiveMode({ onClose, systemInstruction }: LiveModeProps) {
   const startSession = async () => {
     setIsConnecting(true);
     try {
-      if (!process.env.GEMINI_API_KEY) {
+      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+      if (!apiKey) {
         throw new Error('Gemini API key is missing. Please check your configuration.');
       }
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey });
       
       const session = await ai.live.connect({
         model: "gemini-2.5-flash-native-audio-preview-12-2025",

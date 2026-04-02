@@ -464,7 +464,7 @@ export function Settings({
                     </button>
                   </div>
                   <div className="bg-white border border-zinc-200 rounded-xl p-3 font-mono text-xs text-zinc-500 overflow-hidden text-ellipsis">
-                    {showApiKey ? process.env.GEMINI_API_KEY || '••••••••••••••••••••••••••••••' : '••••••••••••••••••••••••••••••'}
+                    {showApiKey ? (process.env.GEMINI_API_KEY || process.env.API_KEY || 'Not configured') : '••••••••••••••••••••••••••••••'}
                   </div>
                   <p className="text-[10px] text-zinc-400 font-medium">Your API key is stored securely and never exposed to the public.</p>
                 </div>

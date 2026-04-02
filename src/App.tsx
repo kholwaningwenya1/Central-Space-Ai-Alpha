@@ -16,6 +16,7 @@ import { Settings } from './components/Settings';
 import { Billing } from './components/Billing';
 import { AdminPanel } from './components/AdminPanel';
 import { Message, Tone, Voice, WorkspaceSession, FileData, SessionMode, Bot, Presence, ConversationType, Reaction, Poll, DocumentVersion, DocumentTemplate, UserProfile, SubscriptionPlan, UserRole, ResultType } from './types';
+import { AppGuideBot } from './components/AppGuideBot';
 import { GoogleGenAI } from "@google/genai";
 import { generateChatResponse, generateChatResponseStream, generateImageFromPrompt, generateVideoFromPrompt, transcribeAudio, translateText, findYouTubeLinks, generateSpeech } from './services/aiService';
 import { LiveMode } from './components/LiveMode';
@@ -116,7 +117,7 @@ export default function App() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(window.innerWidth < 1024);
   const [pendingFiles, setPendingFiles] = useState<FileData[]>([]);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
@@ -169,6 +170,8 @@ export default function App() {
       if (window.aistudio?.hasSelectedApiKey) {
         const hasKey = await window.aistudio.hasSelectedApiKey();
         setHasApiKey(hasKey);
+      } else if (!process.env.GEMINI_API_KEY && !process.env.API_KEY) {
+        setHasApiKey(false);
       }
     };
     checkApiKey();
@@ -303,8 +306,26 @@ export default function App() {
       const suggestions = JSON.parse(response.text || "[]");
       return suggestions.slice(0, 3);
     } catch (error) {
-      console.error("Error generating suggestions:", error);
-      return [];
+      console.warn("Gemini suggestions failed, attempting fallback...", error);
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [{ role: 'user', content: `Based on the following AI response, suggest 3 short, relevant follow-up questions or actions the user might want to take. Return ONLY a JSON array of strings.\n\nAI Response: "${lastAssistantMessage}"` }],
+            settings: { modelId: 'gpt-4o-mini', customSystemInstruction: "You are a helpful assistant that returns ONLY a JSON array of strings." },
+            modelId: 'gpt-4o-mini',
+            searchEnabled: false
+          })
+        });
+        if (!response.ok) throw new Error('Fallback suggestions failed');
+        const data = await response.json();
+        const suggestions = JSON.parse(data.text || "[]");
+        return suggestions.slice(0, 3);
+      } catch (fallbackError) {
+        console.error("Error generating suggestions:", fallbackError);
+        return [];
+      }
     }
   };
 
@@ -1842,156 +1863,163 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <div className="flex h-screen bg-zinc-50 overflow-hidden">
+      <div className="flex h-screen bg-zinc-50 overflow-hidden relative">
+        {/* Mobile Sidebar Overlay */}
+        {isMobileView && !isSidebarCollapsed && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsSidebarCollapsed(true)}
+            className="absolute inset-0 bg-black/50 z-40 backdrop-blur-sm"
+          />
+        )}
+
         {/* Global Search Overlay */}
-      <AnimatePresence>
-        {isLibraryModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
-            onClick={() => setIsLibraryModalOpen(false)}
-          >
+        <AnimatePresence>
+          {isLibraryModalOpen && (
             <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden"
-              onClick={e => e.stopPropagation()}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+              onClick={() => setIsLibraryModalOpen(false)}
             >
-              <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-zinc-900">Select from Library</h2>
-                <button
-                  onClick={() => setIsLibraryModalOpen(false)}
-                  className="p-2 text-zinc-400 hover:text-zinc-950 hover:bg-zinc-100 rounded-xl transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
-                {currentSession?.files && currentSession.files.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {currentSession.files.map(file => (
-                      <button
-                        key={file.id}
-                        onClick={() => {
-                          setPendingFiles(prev => [...prev, file]);
-                          setIsLibraryModalOpen(false);
-                        }}
-                        className="flex flex-col items-center gap-3 p-4 bg-zinc-50 rounded-2xl border border-zinc-100 hover:border-zinc-300 hover:bg-zinc-100 transition-all text-left"
-                      >
-                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-zinc-400 shadow-sm">
-                          {file.type.startsWith('image/') ? <ImageIcon className="w-6 h-6" /> : <FileText className="w-6 h-6" />}
-                        </div>
-                        <div className="w-full text-center">
-                          <div className="text-sm font-bold text-zinc-900 truncate">{file.name}</div>
-                          <div className="text-xs text-zinc-500">{(file.size / 1024).toFixed(1)} KB</div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <Folder className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-bold text-zinc-900 mb-2">No files in library</h3>
-                    <p className="text-zinc-500 text-sm">Upload files to this workspace first to share them.</p>
-                  </div>
-                )}
-              </div>
+              <motion.div
+                initial={{ scale: 0.95, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.95, y: 20 }}
+                className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-zinc-900">Select from Library</h2>
+                  <button
+                    onClick={() => setIsLibraryModalOpen(false)}
+                    className="p-2 text-zinc-400 hover:text-zinc-950 hover:bg-zinc-100 rounded-xl transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                  {currentSession?.files && currentSession.files.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      {currentSession.files.map(file => (
+                        <button
+                          key={file.id}
+                          onClick={() => {
+                            setPendingFiles(prev => [...prev, file]);
+                            setIsLibraryModalOpen(false);
+                          }}
+                          className="flex flex-col items-center gap-3 p-4 bg-zinc-50 rounded-2xl border border-zinc-100 hover:border-zinc-300 hover:bg-zinc-100 transition-all text-left"
+                        >
+                          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-zinc-400 shadow-sm">
+                            {file.type.startsWith('image/') ? <ImageIcon className="w-6 h-6" /> : <FileText className="w-6 h-6" />}
+                          </div>
+                          <div className="w-full text-center">
+                            <div className="text-sm font-bold text-zinc-900 truncate">{file.name}</div>
+                            <div className="text-xs text-zinc-500">{(file.size / 1024).toFixed(1)} KB</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <Folder className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
+                      <h3 className="text-lg font-bold text-zinc-900 mb-2">No files in library</h3>
+                      <p className="text-zinc-500 text-sm">Upload files to this workspace first to share them.</p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
-      <AnimatePresence>
-        {isGlobalSearchOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm z-[100] flex items-start justify-center pt-24 px-4"
-            onClick={() => setIsGlobalSearchOpen(false)}
-          >
+        <AnimatePresence>
+          {isGlobalSearchOpen && (
             <motion.div
-              initial={{ scale: 0.95, y: -20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: -20 }}
-              className="w-full max-w-2xl bg-white rounded-[2rem] shadow-2xl overflow-hidden"
-              onClick={e => e.stopPropagation()}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-zinc-950/40 backdrop-blur-sm z-[100] flex items-start justify-center pt-24 px-4"
+              onClick={() => setIsGlobalSearchOpen(false)}
             >
-              <div className="p-6 border-b border-zinc-100 flex items-center gap-4">
-                <Search className="w-6 h-6 text-zinc-400" />
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="Search messages, files, and sessions..."
-                  value={globalSearchQuery}
-                  onChange={e => setGlobalSearchQuery(e.target.value)}
-                  className="flex-1 bg-transparent border-none text-lg text-zinc-900 focus:outline-none placeholder:text-zinc-400"
-                />
-                <button 
-                  onClick={() => setIsGlobalSearchOpen(false)}
-                  className="p-2 hover:bg-zinc-50 rounded-xl text-zinc-400 transition-all"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              
-              <div className="max-h-[60vh] overflow-y-auto p-4 space-y-2 custom-scrollbar">
-                {globalSearchQuery.length > 0 ? (
-                  <>
-                    <div className="px-4 py-2 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Sessions</div>
-                    {sessions.filter(s => s.title.toLowerCase().includes(globalSearchQuery.toLowerCase())).map(s => (
-                      <button
-                        key={s.id}
-                        onClick={() => {
-                          setCurrentSessionId(s.id);
-                          setIsGlobalSearchOpen(false);
-                        }}
-                        className="w-full flex items-center gap-4 p-4 hover:bg-zinc-50 rounded-2xl transition-all text-left group"
-                      >
-                        <div className="w-10 h-10 bg-zinc-100 rounded-xl flex items-center justify-center group-hover:bg-white transition-all">
-                          <FileText className="w-5 h-5 text-zinc-400" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-bold text-zinc-900">{s.title}</div>
-                          <div className="text-[10px] text-zinc-400 uppercase tracking-widest">{s.type}</div>
-                        </div>
-                      </button>
-                    ))}
-                    
-                    <div className="px-4 py-2 mt-4 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Messages</div>
-                    {sessions.flatMap(s => s.messages.filter(m => m.content.toLowerCase().includes(globalSearchQuery.toLowerCase())).map(m => ({ ...m, sessionTitle: s.title, sessionId: s.id }))).slice(0, 10).map(m => (
-                      <button
-                        key={m.id}
-                        onClick={() => {
-                          setCurrentSessionId(m.sessionId);
-                          setIsGlobalSearchOpen(false);
-                        }}
-                        className="w-full flex flex-col gap-1 p-4 hover:bg-zinc-50 rounded-2xl transition-all text-left group"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{m.sessionTitle}</span>
-                          <span className="text-[10px] text-zinc-300">{new Date(m.timestamp).toLocaleDateString()}</span>
-                        </div>
-                        <div className="text-sm text-zinc-600 line-clamp-2">{m.content}</div>
-                      </button>
-                    ))}
-                  </>
-                ) : (
-                  <div className="py-12 text-center">
-                    <Search className="w-12 h-12 text-zinc-100 mx-auto mb-4" />
-                    <p className="text-zinc-400 text-sm font-medium">Search across all your workspaces and conversations.</p>
+              <motion.div
+                initial={{ y: -20, opacity: 0, scale: 0.95 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ y: -20, opacity: 0, scale: 0.95 }}
+                onClick={e => e.stopPropagation()}
+                className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-zinc-100"
+              >
+                <div className="p-6 border-b border-zinc-100 flex items-center gap-4">
+                  <Search className="w-6 h-6 text-zinc-400" />
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Search workspaces, messages, and files..."
+                    value={globalSearchQuery}
+                    onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                    className="flex-1 bg-transparent border-none text-lg text-zinc-900 focus:outline-none placeholder:text-zinc-300 font-medium"
+                  />
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-1 bg-zinc-100 rounded-md text-[10px] font-bold text-zinc-400 uppercase tracking-widest">ESC</span>
                   </div>
-                )}
-              </div>
+                </div>
+                <div className="max-h-[500px] overflow-y-auto p-4 custom-scrollbar">
+                  {globalSearchQuery ? (
+                    <>
+                      <div className="px-4 py-2 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Workspaces</div>
+                      {sessions.filter(s => s.title.toLowerCase().includes(globalSearchQuery.toLowerCase())).map(s => (
+                        <button
+                          key={s.id}
+                          onClick={() => {
+                            setCurrentSessionId(s.id);
+                            setIsGlobalSearchOpen(false);
+                          }}
+                          className="w-full flex items-center gap-4 p-4 hover:bg-zinc-50 rounded-2xl transition-all text-left group"
+                        >
+                          <div className="w-10 h-10 bg-zinc-100 rounded-xl flex items-center justify-center group-hover:bg-white transition-all">
+                            <FileText className="w-5 h-5 text-zinc-400" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-zinc-900">{s.title}</div>
+                            <div className="text-[10px] text-zinc-400 uppercase tracking-widest">{s.type}</div>
+                          </div>
+                        </button>
+                      ))}
+                      
+                      <div className="px-4 py-2 mt-4 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Messages</div>
+                      {sessions.flatMap(s => s.messages.filter(m => m.content.toLowerCase().includes(globalSearchQuery.toLowerCase())).map(m => ({ ...m, sessionTitle: s.title, sessionId: s.id }))).slice(0, 10).map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => {
+                            setCurrentSessionId(m.sessionId);
+                            setIsGlobalSearchOpen(false);
+                          }}
+                          className="w-full flex flex-col gap-1 p-4 hover:bg-zinc-50 rounded-2xl transition-all text-left group"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{m.sessionTitle}</span>
+                            <span className="text-[10px] text-zinc-300">{new Date(m.timestamp).toLocaleDateString()}</span>
+                          </div>
+                          <div className="text-sm text-zinc-600 line-clamp-2">{m.content}</div>
+                        </button>
+                      ))}
+                    </>
+                  ) : (
+                    <div className="py-12 text-center">
+                      <Search className="w-12 h-12 text-zinc-100 mx-auto mb-4" />
+                      <p className="text-zinc-400 text-sm font-medium">Search across all your workspaces and conversations.</p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
-      <Sidebar 
+        <Sidebar 
           currentTone={currentSession?.tone || 'Professional'} 
           currentVoice={currentSession?.voice || 'Second person'} 
           currentResultType={currentSession?.resultType || 'Text'}
@@ -2010,17 +2038,32 @@ export default function App() {
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           sessions={sessions}
           currentSessionId={currentSessionId}
-          onSessionSelect={setCurrentSessionId}
-          onNewSession={handleNewSession}
+          onSessionSelect={(id) => {
+            setCurrentSessionId(id);
+            if (isMobileView) setIsSidebarCollapsed(true);
+          }}
+          onNewSession={(type, title, members) => {
+            handleNewSession(type, title, members);
+            if (isMobileView) setIsSidebarCollapsed(true);
+          }}
           user={user}
           presence={currentSession?.presence}
+          userProfile={userProfile}
         />
 
-        <main className="flex-1 flex flex-col relative">
+        <main className="flex-1 flex flex-col relative w-full min-w-0">
           {/* Header */}
-          <header className="h-14 border-b border-zinc-200 bg-white flex items-center justify-between px-6 shrink-0 z-10">
-            <div className="flex items-center gap-4">
-              <h2 className="text-sm font-semibold text-zinc-900 truncate max-w-[200px]">
+          <header className="h-14 border-b border-zinc-200 bg-white flex items-center justify-between px-4 md:px-6 shrink-0 z-10">
+            <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
+              {isMobileView && (
+                <button 
+                  onClick={() => setIsSidebarCollapsed(false)}
+                  className="p-2 -ml-2 text-zinc-400 hover:text-zinc-900 transition-colors"
+                >
+                  <Search className="w-5 h-5 rotate-90" />
+                </button>
+              )}
+              <h2 className="text-sm font-semibold text-zinc-900 truncate max-w-[120px] md:max-w-[200px]">
                 {currentSession?.title || 'No Workspace Selected'}
               </h2>
               <div className="h-4 w-px bg-zinc-200" />
@@ -2687,120 +2730,131 @@ export default function App() {
                 }}
                 disabled={!currentSession}
                 placeholder={currentSession ? "Ask anything... (Shift+Enter for new line)" : "Create a workspace to start"}
-                className="w-full bg-white border border-zinc-100 rounded-[2rem] px-8 py-6 pr-48 text-base focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:border-zinc-950/20 resize-none min-h-[80px] max-h-[300px] disabled:opacity-50 shadow-2xl shadow-zinc-950/5 transition-all font-medium placeholder:text-zinc-300"
+                className={cn(
+                  "w-full bg-white border border-zinc-100 rounded-[2rem] px-6 md:px-8 py-4 md:py-6 text-sm md:text-base focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:border-zinc-950/20 resize-none min-h-[60px] md:min-h-[80px] max-h-[300px] disabled:opacity-50 shadow-2xl shadow-zinc-950/5 transition-all font-medium placeholder:text-zinc-300",
+                  isMobileView ? "pr-14" : "pr-56"
+                )}
                 rows={1}
               />
-              <div className="absolute right-4 bottom-4 flex items-center gap-2">
-                <div className="flex items-center gap-1 bg-zinc-50 p-1.5 rounded-2xl border border-zinc-100">
-                  <button
-                    type="button"
-                    onClick={() => currentSessionId && updateSession(currentSessionId, { searchEnabled: !currentSession?.searchEnabled })}
-                    className={cn(
-                      "p-2.5 rounded-xl transition-all",
-                      currentSession?.searchEnabled ? "bg-amber-100 text-amber-600 shadow-sm" : "text-zinc-400 hover:text-zinc-950 hover:bg-white"
-                    )}
-                    title="Web Search"
-                  >
-                    <Search className="w-5 h-5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={isRecording ? stopRecording : startRecording}
-                    className={cn(
-                      "p-2.5 rounded-xl transition-all",
-                      isRecording ? "bg-red-100 text-red-600 animate-pulse shadow-sm" : "text-zinc-400 hover:text-zinc-950 hover:bg-white"
-                    )}
-                    title={isRecording ? "Stop Recording" : "Voice Note"}
-                  >
-                    {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                  </button>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleFileUpload} 
-                    className="hidden" 
-                    multiple
-                  />
-                  <div className="relative">
+              <div className={cn(
+                "absolute flex items-center gap-2",
+                isMobileView ? "right-3 bottom-3" : "right-4 bottom-4"
+              )}>
+                {!isMobileView && (
+                  <div className="flex items-center gap-1 bg-zinc-50 p-1.5 rounded-2xl border border-zinc-100">
                     <button
                       type="button"
-                      onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
-                      disabled={!currentSession || isLoading}
-                      className="p-2.5 text-zinc-400 hover:text-zinc-950 transition-all rounded-xl hover:bg-white disabled:opacity-50"
-                      title="Add Emoji"
-                    >
-                      <Smile className="w-5 h-5" />
-                    </button>
-                    <AnimatePresence>
-                      {isEmojiPickerOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                          className="absolute bottom-full right-0 mb-2 z-50"
-                        >
-                          <EmojiPicker
-                            onEmojiClick={(emojiData) => {
-                              setInput(prev => prev + emojiData.emoji);
-                              setIsEmojiPickerOpen(false);
-                            }}
-                          />
-                        </motion.div>
+                      onClick={() => currentSessionId && updateSession(currentSessionId, { searchEnabled: !currentSession?.searchEnabled })}
+                      className={cn(
+                        "p-2.5 rounded-xl transition-all",
+                        currentSession?.searchEnabled ? "bg-amber-100 text-amber-600 shadow-sm" : "text-zinc-400 hover:text-zinc-950 hover:bg-white"
                       )}
-                    </AnimatePresence>
-                  </div>
-
-                  <div className="relative">
+                      title="Web Search"
+                    >
+                      <Search className="w-5 h-5" />
+                    </button>
                     <button
-                      onClick={() => setIsAttachmentMenuOpen(!isAttachmentMenuOpen)}
-                      disabled={!currentSession || isLoading}
-                      className="p-2.5 text-zinc-400 hover:text-zinc-950 transition-all rounded-xl hover:bg-white disabled:opacity-50"
-                      title="Attach Files"
-                    >
-                      <Paperclip className="w-5 h-5" />
-                    </button>
-                    <AnimatePresence>
-                      {isAttachmentMenuOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                          className="absolute bottom-full right-0 mb-2 w-48 bg-white rounded-2xl shadow-xl border border-zinc-100 overflow-hidden z-50"
-                        >
-                          <button
-                            onClick={() => {
-                              setIsAttachmentMenuOpen(false);
-                              fileInputRef.current?.click();
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950 transition-colors text-left"
-                          >
-                            <ImageIcon className="w-4 h-4" />
-                            From Computer
-                          </button>
-                          <button
-                            onClick={() => {
-                              setIsAttachmentMenuOpen(false);
-                              setIsLibraryModalOpen(true);
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950 transition-colors text-left border-t border-zinc-100"
-                          >
-                            <Folder className="w-4 h-4" />
-                            From Library
-                          </button>
-                        </motion.div>
+                      type="button"
+                      onClick={isRecording ? stopRecording : startRecording}
+                      className={cn(
+                        "p-2.5 rounded-xl transition-all",
+                        isRecording ? "bg-red-100 text-red-600 animate-pulse shadow-sm" : "text-zinc-400 hover:text-zinc-950 hover:bg-white"
                       )}
-                    </AnimatePresence>
+                      title={isRecording ? "Stop Recording" : "Voice Note"}
+                    >
+                      {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                    </button>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      onChange={handleFileUpload} 
+                      className="hidden" 
+                      multiple
+                    />
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
+                        disabled={!currentSession || isLoading}
+                        className="p-2.5 text-zinc-400 hover:text-zinc-950 transition-all rounded-xl hover:bg-white disabled:opacity-50"
+                        title="Add Emoji"
+                      >
+                        <Smile className="w-5 h-5" />
+                      </button>
+                      <AnimatePresence>
+                        {isEmojiPickerOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            className="absolute bottom-full right-0 mb-2 z-50"
+                          >
+                            <EmojiPicker
+                              onEmojiClick={(emojiData) => {
+                                setInput(prev => prev + emojiData.emoji);
+                                setIsEmojiPickerOpen(false);
+                              }}
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    <div className="relative">
+                      <button
+                        onClick={() => setIsAttachmentMenuOpen(!isAttachmentMenuOpen)}
+                        disabled={!currentSession || isLoading}
+                        className="p-2.5 text-zinc-400 hover:text-zinc-950 transition-all rounded-xl hover:bg-white disabled:opacity-50"
+                        title="Attach Files"
+                      >
+                        <Paperclip className="w-5 h-5" />
+                      </button>
+                      <AnimatePresence>
+                        {isAttachmentMenuOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            className="absolute bottom-full right-0 mb-2 w-48 bg-white rounded-2xl shadow-xl border border-zinc-100 overflow-hidden z-50"
+                          >
+                            <button
+                              onClick={() => {
+                                setIsAttachmentMenuOpen(false);
+                                fileInputRef.current?.click();
+                              }}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950 transition-colors text-left"
+                            >
+                              <ImageIcon className="w-4 h-4" />
+                              From Computer
+                            </button>
+                            <button
+                              onClick={() => {
+                                setIsAttachmentMenuOpen(false);
+                                setIsLibraryModalOpen(true);
+                              }}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950 transition-colors text-left border-t border-zinc-100"
+                            >
+                              <Folder className="w-4 h-4" />
+                              From Library
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   </div>
-                </div>
+                )}
                 <button
                   onClick={handleSend}
                   disabled={(!input.trim() && pendingFiles.length === 0) || isLoading || !currentSession}
-                  className="p-3.5 bg-zinc-950 text-white rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-950/20 active:scale-95 group/send"
+                  className={cn(
+                    "bg-zinc-950 text-white rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-950/20 active:scale-95 group/send flex items-center justify-center",
+                    isMobileView ? "p-2.5" : "p-3.5"
+                  )}
                 >
                   {isLoading ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
+                    <Loader2 className={cn(isMobileView ? "w-4 h-4" : "w-6 h-6", "animate-spin")} />
                   ) : (
-                    <Send className="w-6 h-6 group-hover/send:translate-x-0.5 group-hover/send:-translate-y-0.5 transition-transform" />
+                    <Send className={cn(isMobileView ? "w-4 h-4" : "w-6 h-6", "group-hover/send:translate-x-0.5 group-hover/send:-translate-y-0.5 transition-transform")} />
                   )}
                 </button>
               </div>
@@ -2888,28 +2942,40 @@ export default function App() {
               </div>
               <h3 className="text-2xl font-bold text-zinc-950 tracking-tight mb-3">API Key Required</h3>
               <p className="text-zinc-500 text-sm font-medium mb-8 leading-relaxed">
-                To generate high-quality videos with Veo, you need to select a paid Google Cloud project API key. 
-                <br /><br />
-                <a 
-                  href="https://ai.google.dev/gemini-api/docs/billing" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-zinc-950 underline font-bold"
-                >
-                  Learn more about billing
-                </a>
+                {window.aistudio?.openSelectKey ? (
+                  <>
+                    To generate high-quality videos with Veo, you need to select a paid Google Cloud project API key. 
+                    <br /><br />
+                    <a 
+                      href="https://ai.google.dev/gemini-api/docs/billing" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-zinc-950 underline font-bold"
+                    >
+                      Learn more about billing
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    The Gemini API key is missing. Please configure the <code>GEMINI_API_KEY</code> in your environment variables to use AI features.
+                  </>
+                )}
               </p>
-              <button
-                onClick={handleOpenSelectKey}
-                className="w-full py-4 bg-zinc-950 text-white rounded-2xl font-bold text-sm hover:bg-zinc-800 transition-all active:scale-95 shadow-xl shadow-zinc-950/10 flex items-center justify-center gap-2"
-              >
-                <Sparkles className="w-4 h-4" />
-                Select API Key
-              </button>
+              {window.aistudio?.openSelectKey && (
+                <button
+                  onClick={handleOpenSelectKey}
+                  className="w-full py-4 bg-zinc-950 text-white rounded-2xl font-bold text-sm hover:bg-zinc-800 transition-all active:scale-95 shadow-xl shadow-zinc-950/10 flex items-center justify-center gap-2"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Select API Key
+                </button>
+              )}
             </motion.div>
           </div>
         )}
       </AnimatePresence>
+      {/* App Guide Chatbot */}
+      <AppGuideBot />
     </ErrorBoundary>
   );
 }

@@ -121,36 +121,74 @@ async function startServer() {
     const { messages, settings, modelId, searchEnabled, libraryContext } = req.body;
 
     try {
-      if (modelId.startsWith('gpt')) {
+      let searchContext = "";
+      if (searchEnabled && process.env.SERPAPI_API_KEY) {
+        const lastMessage = messages[messages.length - 1].content;
+        try {
+          const serpResponse = await fetch(`https://serpapi.com/search.json?q=${encodeURIComponent(lastMessage)}&api_key=${process.env.SERPAPI_API_KEY}`);
+          const serpData = await serpResponse.json();
+          if (serpData.organic_results && serpData.organic_results.length > 0) {
+            searchContext = "\n\n[Web Search Results]:\n" + serpData.organic_results.slice(0, 3).map((r: any) => `- ${r.title}: ${r.snippet} (${r.link})`).join("\n");
+          }
+        } catch (e) {
+          console.error("SerpAPI search failed:", e);
+        }
+      }
+
+      const systemPrompt = (settings.customSystemInstruction || "You are a helpful assistant.") + (libraryContext ? `\n\n[Workspace Library Context]:\n${libraryContext}` : "") + searchContext;
+
+      let responseText = "";
+
+      const tryOpenAI = async (model: string) => {
         if (!openai) throw new Error("OpenAI API key not configured");
-        
         const response = await openai.chat.completions.create({
-          model: modelId,
+          model: model,
           messages: [
-            { role: 'system', content: settings.customSystemInstruction || "You are a helpful assistant." },
+            { role: 'system', content: systemPrompt },
             ...messages.map((m: any) => ({ role: m.role, content: m.content }))
           ],
           temperature: 0.7,
         });
+        return response.choices[0].message.content;
+      };
 
-        return res.json({ text: response.choices[0].message.content });
-      }
-
-      if (modelId.startsWith('claude')) {
+      const tryAnthropic = async (model: string) => {
         if (!anthropic) throw new Error("Anthropic API key not configured");
-
         const response = await anthropic.messages.create({
-          model: modelId,
+          model: model,
           max_tokens: 4096,
-          system: settings.customSystemInstruction || "You are a helpful assistant.",
+          system: systemPrompt,
           messages: messages.map((m: any) => ({ role: m.role, content: m.content }))
         });
-
         // @ts-ignore
-        return res.json({ text: response.content[0].text });
+        return response.content[0].text;
+      };
+
+      if (modelId.startsWith('gpt')) {
+        try {
+          responseText = await tryOpenAI(modelId) || "";
+        } catch (e) {
+          console.warn("OpenAI failed, falling back to Anthropic", e);
+          responseText = await tryAnthropic('claude-3-5-sonnet-20241022') || "";
+        }
+      } else if (modelId.startsWith('claude')) {
+        try {
+          responseText = await tryAnthropic(modelId) || "";
+        } catch (e) {
+          console.warn("Anthropic failed, falling back to OpenAI", e);
+          responseText = await tryOpenAI('gpt-4o') || "";
+        }
+      } else {
+        // Fallback for Gemini if it was routed here
+        try {
+          responseText = await tryOpenAI('gpt-4o') || "";
+        } catch (e) {
+          console.warn("OpenAI fallback failed, trying Anthropic", e);
+          responseText = await tryAnthropic('claude-3-5-sonnet-20241022') || "";
+        }
       }
 
-      res.status(400).json({ error: "Unsupported model" });
+      return res.json({ text: responseText });
     } catch (error: any) {
       console.error("AI Proxy Error:", error);
       res.status(500).json({ error: error.message });

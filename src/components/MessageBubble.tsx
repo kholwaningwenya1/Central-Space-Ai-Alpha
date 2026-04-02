@@ -303,9 +303,8 @@ export function MessageBubble({ message, conversationType = 'workspace', onGener
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
-        "group flex gap-8 p-10 transition-all duration-500 font-sans relative",
-        isAssistant ? "bg-white" : isBot ? "bg-zinc-50/50 border-y border-zinc-100/50" : "bg-zinc-50/30",
-        "hover:bg-zinc-50/80"
+        "group flex gap-8 p-6 md:p-10 transition-all duration-500 font-sans relative",
+        "hover:bg-zinc-50/50"
       )}
     >
       <div className={cn(

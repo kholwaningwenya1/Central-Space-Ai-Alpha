@@ -293,13 +293,28 @@ export async function generateChatResponseStream(
     };
   }
 
-  const responseStream = await ai.models.generateContentStream({
-    model: settings.modelId as any,
-    contents,
-    config,
-  });
+  try {
+    const responseStream = await ai.models.generateContentStream({
+      model: settings.modelId as any,
+      contents,
+      config,
+    });
 
-  return { responseStream, agentDiscussion };
+    return { responseStream, agentDiscussion };
+  } catch (error: any) {
+    console.warn("Gemini API failed, attempting fallback...", error);
+    
+    // Fallback to OpenAI (gpt-4o)
+    const fallbackModel = "gpt-4o";
+    const { text, sources, agentDiscussion: disc } = await generateChatResponse(messages, { ...settings, modelId: fallbackModel as any }, location);
+    
+    // Return a fake stream for non-Gemini models
+    const fakeStream = (async function* () {
+      yield { text };
+    })();
+    
+    return { responseStream: fakeStream, agentDiscussion: disc };
+  }
 }
 
 export async function generateChatResponse(
@@ -430,39 +445,58 @@ export async function generateChatResponse(
     };
   }
 
-  const response = await ai.models.generateContent({
-    model: settings.modelId as any,
-    contents,
-    config,
-  });
+  try {
+    const response = await ai.models.generateContent({
+      model: settings.modelId as any,
+      contents,
+      config,
+    });
 
-  // Extract grounding metadata if available
-  const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
-  const text = response.text || "I'm sorry, I couldn't generate a response.";
-  
-  const sources = groundingMetadata?.groundingChunks
-    ?.map(chunk => {
-      if (chunk.web) {
-        return {
-          uri: chunk.web.uri || '',
-          title: chunk.web.title || 'Web Source',
-          type: 'web' as const
-        };
-      }
-      if (chunk.maps) {
-        return {
-          uri: chunk.maps.uri || '',
-          title: chunk.maps.title || 'Maps Source',
-          type: 'maps' as const
-        };
-      }
-      return null;
-    })
-    .filter((s): s is NonNullable<typeof s> => s !== null);
+    // Extract grounding metadata if available
+    const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
+    const text = response.text || "I'm sorry, I couldn't generate a response.";
+    
+    const sources = groundingMetadata?.groundingChunks
+      ?.map(chunk => {
+        if (chunk.web) {
+          return {
+            uri: chunk.web.uri || '',
+            title: chunk.web.title || 'Web Source',
+            type: 'web' as const
+          };
+        }
+        if (chunk.maps) {
+          return {
+            uri: chunk.maps.uri || '',
+            title: chunk.maps.title || 'Maps Source',
+            type: 'maps' as const
+          };
+        }
+        return null;
+      })
+      .filter((s): s is NonNullable<typeof s> => s !== null);
 
-  const functionCalls = response.functionCalls;
+    const functionCalls = response.functionCalls;
 
-  return { text, sources, agentDiscussion, functionCalls };
+    return { text, sources, agentDiscussion, functionCalls };
+  } catch (error: any) {
+    console.warn("Gemini API failed, attempting fallback...", error);
+    const fallbackModel = "gpt-4o";
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        messages, 
+        settings, 
+        modelId: fallbackModel,
+        searchEnabled: settings.searchEnabled,
+        libraryContext: (settings.libraryContext || "") + agentContext
+      })
+    });
+    if (!response.ok) throw new Error('Failed to generate response with fallback');
+    const data = await response.json();
+    return { text: data.text, sources: data.sources || [], agentDiscussion };
+  }
 }
 
 export async function transcribeAudio(audioBase64: string, mimeType: string) {

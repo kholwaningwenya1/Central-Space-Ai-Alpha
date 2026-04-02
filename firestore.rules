@@ -152,7 +152,8 @@ service cloud.firestore {
              msg.content is string &&
              msg.timestamp is number &&
              (!('poll' in msg) || isValidPoll(msg.poll)) &&
-             (!('reactions' in msg) || msg.reactions is list);
+             (!('reactions' in msg) || msg.reactions is list) &&
+             (!('dueDate' in msg) || msg.dueDate is number);
     }
 
     function isValidBot(data) {
@@ -163,7 +164,9 @@ service cloud.firestore {
              data.systemInstruction is string &&
              data.creatorId is string &&
              data.isActive is bool &&
-             data.createdAt is number;
+             data.createdAt is number &&
+             (!('category' in data) || data.category is string) &&
+             (!('tone' in data) || data.tone is string);
     }
 
     function isValidNotification(data) {

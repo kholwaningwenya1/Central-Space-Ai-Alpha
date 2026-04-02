@@ -78,6 +78,8 @@ export interface Bot {
   rating?: number;
   reviewsCount?: number;
   exampleInteractions?: { user: string; bot: string }[];
+  category?: string;
+  tone?: string;
 }
 
 export interface Poll {
@@ -128,6 +130,7 @@ export interface Message {
     action?: string;
   }[];
   isStreaming?: boolean;
+  dueDate?: number;
 }
 
 export interface DocumentVersion {

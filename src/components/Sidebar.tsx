@@ -140,10 +140,11 @@ export function Sidebar({
     setIsSummarizing(true);
     
     try {
-      if (!process.env.GEMINI_API_KEY) {
+      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+      if (!apiKey) {
         throw new Error('Gemini API key is missing. Please check your configuration.');
       }
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey });
       const history = currentSession.messages.map(m => `${m.role}: ${m.content}`).join('\n');
       
       const response = await ai.models.generateContent({
@@ -152,8 +153,26 @@ export function Sidebar({
       });
       setSummary(response.text || "Could not generate summary.");
     } catch (error) {
-      console.error("Summary failed:", error);
-      setSummary("Failed to call the Gemini API. Please try again.");
+      console.warn("Gemini summary failed, attempting fallback...", error);
+      try {
+        const history = currentSession.messages.map(m => `${m.role}: ${m.content}`).join('\n');
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [{ role: 'user', content: `Summarize this workspace session in 3-5 bullet points focusing on key decisions and actions:\n\n${history}` }],
+            settings: { modelId: 'gpt-4o-mini', customSystemInstruction: "You are a helpful assistant that provides concise summaries." },
+            modelId: 'gpt-4o-mini',
+            searchEnabled: false
+          })
+        });
+        if (!response.ok) throw new Error('Fallback summary failed');
+        const data = await response.json();
+        setSummary(data.text || "Could not generate summary.");
+      } catch (fallbackError) {
+        console.error("Summary failed:", fallbackError);
+        setSummary("Failed to generate summary. Please try again.");
+      }
     } finally {
       setIsSummarizing(false);
     }

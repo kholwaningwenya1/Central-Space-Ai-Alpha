@@ -72,7 +72,9 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
     avatar: '',
     isActive: true,
     tags: [],
-    exampleInteractions: [{ user: 'Hello', bot: 'Hi there! How can I help you today?' }]
+    exampleInteractions: [{ user: 'Hello', bot: 'Hi there! How can I help you today?' }],
+    category: '',
+    tone: ''
   });
 
   const availableTools = [
@@ -285,7 +287,9 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
       isActive: true,
       createdAt: editingBotId ? (bots.find(b => b.id === editingBotId)?.createdAt || Date.now()) : Date.now(),
       tags: newBot.tags || [],
-      exampleInteractions: newBot.exampleInteractions || []
+      exampleInteractions: newBot.exampleInteractions || [],
+      category: newBot.category || '',
+      tone: newBot.tone || ''
     };
 
     try {
@@ -304,7 +308,9 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
         avatar: '',
         isActive: true,
         tags: [],
-        exampleInteractions: [{ user: 'Hello', bot: 'Hi there! How can I help you today?' }]
+        exampleInteractions: [{ user: 'Hello', bot: 'Hi there! How can I help you today?' }],
+        category: '',
+        tone: ''
       });
     } catch (error) {
       console.error("Error saving bot:", error);
@@ -324,7 +330,9 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
       avatar: bot.avatar || '',
       isActive: bot.isActive ?? true,
       tags: bot.tags || [],
-      exampleInteractions: bot.exampleInteractions || []
+      exampleInteractions: bot.exampleInteractions || [],
+      category: bot.category || '',
+      tone: bot.tone || ''
     });
     setEditingBotId(bot.id);
     setIsCreating(true);
@@ -343,7 +351,9 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
       commands: template.commands,
       avatar: template.avatar,
       tags: template.tags || [],
-      exampleInteractions: template.exampleInteractions || []
+      exampleInteractions: template.exampleInteractions || [],
+      category: template.category || '',
+      tone: template.tone || ''
     });
   };
 
@@ -604,13 +614,23 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
                       onClick={() => setViewingBot(bot)}
                     >
                       <h3 className="text-xl font-bold text-zinc-950 mb-1 tracking-tight group-hover:text-zinc-600 transition-colors">{bot.name}</h3>
-                      <div className="flex items-center gap-2 mb-4">
+                      <div className="flex items-center gap-2 mb-4 flex-wrap">
                         <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{bot.username}</p>
                         {bot.rating && (
                           <div className="flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full border border-amber-100">
                             <span className="text-[10px] font-bold">{bot.rating}</span>
                             <Zap className="w-2 h-2 fill-current" />
                           </div>
+                        )}
+                        {bot.category && (
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-bold uppercase tracking-wider rounded-md border border-blue-100">
+                            {bot.category}
+                          </span>
+                        )}
+                        {bot.tone && (
+                          <span className="px-2 py-0.5 bg-purple-50 text-purple-600 text-[9px] font-bold uppercase tracking-wider rounded-md border border-purple-100">
+                            {bot.tone}
+                          </span>
                         )}
                       </div>
                       
@@ -898,6 +918,45 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
                       <option value="claude-3-opus">Claude 3 Opus</option>
                     </optgroup>
                   </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">Category / Niche</label>
+                    <select 
+                      value={newBot.category || ''}
+                      onChange={(e) => setNewBot({ ...newBot, category: e.target.value })}
+                      className="w-full bg-zinc-50 border border-zinc-100 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-950/10 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="">Select Category</option>
+                      <option value="Development">Development & Coding</option>
+                      <option value="Education">Education & Learning</option>
+                      <option value="Marketing">Marketing & SEO</option>
+                      <option value="Productivity">Productivity & Planning</option>
+                      <option value="Support">Customer Support</option>
+                      <option value="Entertainment">Entertainment & Fun</option>
+                      <option value="Writing">Writing & Editing</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">Tone of Voice</label>
+                    <select 
+                      value={newBot.tone || ''}
+                      onChange={(e) => setNewBot({ ...newBot, tone: e.target.value })}
+                      className="w-full bg-zinc-50 border border-zinc-100 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-950/10 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="">Select Tone</option>
+                      <option value="Professional">Professional</option>
+                      <option value="Friendly">Friendly & Casual</option>
+                      <option value="Academic">Academic & Formal</option>
+                      <option value="Humorous">Humorous & Witty</option>
+                      <option value="Direct">Direct & Concise</option>
+                      <option value="Empathetic">Empathetic & Supportive</option>
+                      <option value="Sarcastic">Sarcastic & Edgy</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -1340,6 +1399,30 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
                           {tag}
                         </span>
                       ))}
+                      {viewingBot.category && (
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-bold uppercase tracking-wider rounded-md border border-blue-100">
+                          {viewingBot.category}
+                        </span>
+                      )}
+                      {viewingBot.tone && (
+                        <span className="px-2 py-0.5 bg-purple-50 text-purple-600 text-[9px] font-bold uppercase tracking-wider rounded-md border border-purple-100">
+                          {viewingBot.tone}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {(!viewingBot.tags || viewingBot.tags.length === 0) && (viewingBot.category || viewingBot.tone) && (
+                    <div className="flex flex-wrap gap-1.5 pt-2">
+                      {viewingBot.category && (
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-bold uppercase tracking-wider rounded-md border border-blue-100">
+                          {viewingBot.category}
+                        </span>
+                      )}
+                      {viewingBot.tone && (
+                        <span className="px-2 py-0.5 bg-purple-50 text-purple-600 text-[9px] font-bold uppercase tracking-wider rounded-md border border-purple-100">
+                          {viewingBot.tone}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
