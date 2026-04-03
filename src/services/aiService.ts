@@ -195,125 +195,96 @@ export async function generateChatResponseStream(
     agentContext = orchestration.context;
   }
 
-  if (settings.modelId.startsWith('gpt') || settings.modelId.startsWith('claude')) {
+  // Always try the backend proxy first for OpenAI/Anthropic, unless explicitly Gemini and we want to try it first.
+  // Actually, user requested: "Remove Gemini API and rely on Open Ai & Anthropic. Only use Gemini after the 2 other API have failed to work."
+  // So we will route ALL requests to the backend first, which we will update to try OpenAI -> Anthropic.
+  // If the backend fails, we fallback to Gemini.
+  
+  try {
     const { text, sources, agentDiscussion: disc } = await generateChatResponse(messages, settings, location);
     
-    // Return a fake stream for non-Gemini models
+    // Return a fake stream for non-Gemini models (or if we routed through backend)
     const fakeStream = (async function* () {
       yield { text };
     })();
     
-    return { responseStream: fakeStream, agentDiscussion: disc };
-  }
-
-  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('Gemini API key is missing. Please check your configuration.');
-  }
-  const ai = new GoogleGenAI({ apiKey });
-  
-  const isGemini25 = settings.modelId.includes('gemini-2.5');
-  
-  const systemInstruction = settings.customSystemInstruction || ((SYSTEM_INSTRUCTION_BASE
-    .replace('{TONE}', settings.tone)
-    .replace('{VOICE}', settings.voice)) 
-    + (settings.libraryContext ? `\n\n[Workspace Library Context]:\n${settings.libraryContext}` : '')
-    + (agentContext ? `\n\n[Agentic Swarm Results]:\n${agentContext}` : '')
-    + (settings.isSuperAdminModeActive ? SUPER_ADMIN_INSTRUCTION : ''));
-
-  // Limit history to last 10 messages to avoid token limits
-  const historyLimit = 10;
-  const limitedMessages = messages.length > historyLimit 
-    ? messages.slice(-historyLimit) 
-    : messages;
-
-  const contents = limitedMessages.map(m => {
-    const parts: any[] = [{ text: m.content || " " }];
+    return { responseStream: fakeStream, agentDiscussion: disc || agentDiscussion };
+  } catch (error: any) {
+    console.warn("Primary APIs (OpenAI/Anthropic) failed, falling back to Gemini...", error);
     
-    if (m.files) {
-      m.files.forEach(file => {
-        if (file.type.startsWith('image/') || file.type.startsWith('audio/')) {
-          parts.push({
-            inlineData: {
-              data: file.data.split(',')[1],
-              mimeType: file.type
-            }
-          });
-        } else if (file.type.includes('text') || file.type.includes('json') || file.type.includes('csv')) {
-          try {
-            const decoded = atob(file.data.split(',')[1]);
-            // Limit individual file context to 10k characters
-            const truncated = decoded.length > 10000 ? decoded.slice(0, 10000) + "... [truncated]" : decoded;
-            parts[0].text += `\n\n[File: ${file.name}]\n${truncated}`;
-          } catch (e) {
-            console.warn(`Failed to decode file ${file.name}`, e);
-          }
-        }
-      });
+    // Fallback to Gemini
+    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('All AI providers failed and Gemini API key is missing.');
     }
+    const ai = new GoogleGenAI({ apiKey });
+    
+    const systemInstruction = settings.customSystemInstruction || ((SYSTEM_INSTRUCTION_BASE
+      .replace('{TONE}', settings.tone)
+      .replace('{VOICE}', settings.voice)) 
+      + (settings.libraryContext ? `\n\n[Workspace Library Context]:\n${settings.libraryContext}` : '')
+      + (agentContext ? `\n\n[Agentic Swarm Results]:\n${agentContext}` : '')
+      + (settings.isSuperAdminModeActive ? SUPER_ADMIN_INSTRUCTION : ''));
 
-    return {
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts
-    };
-  });
+    const historyLimit = 10;
+    const limitedMessages = messages.length > historyLimit 
+      ? messages.slice(-historyLimit) 
+      : messages;
 
-  const tools: any[] = [];
-  
-  if (settings.customTools) {
-    if (settings.customTools.includes('web_search')) tools.push({ googleSearch: {} });
-    if (settings.customTools.includes('maps')) tools.push({ googleMaps: {} });
-  } else {
-    if (settings.searchEnabled) {
+    const contents = limitedMessages.map(m => {
+      const parts: any[] = [{ text: m.content || " " }];
+      if (m.files) {
+        m.files.forEach(file => {
+          if (file.type.startsWith('image/') || file.type.startsWith('audio/')) {
+            parts.push({
+              inlineData: { data: file.data.split(',')[1], mimeType: file.type }
+            });
+          } else if (file.type.includes('text') || file.type.includes('json') || file.type.includes('csv')) {
+            try {
+              const decoded = atob(file.data.split(',')[1]);
+              const truncated = decoded.length > 10000 ? decoded.slice(0, 10000) + "... [truncated]" : decoded;
+              parts[0].text += `\n\n[File: ${file.name}]\n${truncated}`;
+            } catch (e) {
+              console.warn(`Failed to decode file ${file.name}`, e);
+            }
+          }
+        });
+      }
+      return { role: m.role === 'assistant' ? 'model' : 'user', parts };
+    });
+
+    const tools: any[] = [];
+    if (settings.customTools) {
+      if (settings.customTools.includes('web_search')) tools.push({ googleSearch: {} });
+      if (settings.customTools.includes('maps')) tools.push({ googleMaps: {} });
+    } else if (settings.searchEnabled) {
       tools.push({ googleSearch: {} });
     }
-    if (isGemini25 && !settings.searchEnabled) {
-      tools.push({ googleMaps: {} });
+    
+    const functionDeclarations = [MODIFY_CANVAS_TOOL];
+    if (settings.customTools?.includes('fetch_tickets')) {
+      functionDeclarations.push(FETCH_TICKETS_TOOL);
     }
-  }
-  
-  const functionDeclarations = [MODIFY_CANVAS_TOOL];
-  if (settings.customTools?.includes('fetch_tickets')) {
-    functionDeclarations.push(FETCH_TICKETS_TOOL);
-  }
-  tools.push({ functionDeclarations });
+    tools.push({ functionDeclarations });
 
-  const config: any = {
-    systemInstruction: systemInstruction,
-    temperature: 0.7,
-    tools,
-    toolConfig: {
-      includeServerSideToolInvocations: true
-    }
-  };
-
-  if (location) {
-    config.toolConfig.retrievalConfig = {
-      latLng: location
+    const config: any = {
+      systemInstruction,
+      temperature: 0.7,
+      tools,
+      toolConfig: { includeServerSideToolInvocations: true }
     };
-  }
 
-  try {
+    if (location) {
+      config.toolConfig.retrievalConfig = { latLng: location };
+    }
+
     const responseStream = await ai.models.generateContentStream({
-      model: settings.modelId as any,
+      model: "gemini-3.1-pro-preview",
       contents,
       config,
     });
 
     return { responseStream, agentDiscussion };
-  } catch (error: any) {
-    console.warn("Gemini API failed, attempting fallback...", error);
-    
-    // Fallback to OpenAI (gpt-4o)
-    const fallbackModel = "gpt-4o";
-    const { text, sources, agentDiscussion: disc } = await generateChatResponse(messages, { ...settings, modelId: fallbackModel as any }, location);
-    
-    // Return a fake stream for non-Gemini models
-    const fakeStream = (async function* () {
-      yield { text };
-    })();
-    
-    return { responseStream: fakeStream, agentDiscussion: disc };
   }
 }
 
@@ -359,95 +330,112 @@ export async function generateChatResponse(
     return { text: data.text, sources: data.sources || [], agentDiscussion };
   }
 
-  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('Gemini API key is missing. Please check your configuration.');
-  }
-  const ai = new GoogleGenAI({ apiKey });
-  
-  const isGemini25 = settings.modelId.includes('gemini-2.5');
-
-  const systemInstruction = settings.customSystemInstruction || ((SYSTEM_INSTRUCTION_BASE
-    .replace('{TONE}', settings.tone)
-    .replace('{VOICE}', settings.voice)) 
-    + (settings.libraryContext ? `\n\n[Workspace Library Context]:\n${settings.libraryContext}` : '')
-    + (agentContext ? `\n\n[Agentic Swarm Results]:\n${agentContext}` : '')
-    + (settings.isSuperAdminModeActive ? SUPER_ADMIN_INSTRUCTION : ''));
-
-  // Limit history to last 10 messages
-  const historyLimit = 10;
-  const limitedMessages = messages.length > historyLimit 
-    ? messages.slice(-historyLimit) 
-    : messages;
-
-  const contents = limitedMessages.map(m => {
-    const parts: any[] = [{ text: m.content || " " }];
-    
-    if (m.files) {
-      m.files.forEach(file => {
-        if (file.type.startsWith('image/') || file.type.startsWith('audio/')) {
-          parts.push({
-            inlineData: {
-              data: file.data.split(',')[1], // Remove prefix
-              mimeType: file.type
-            }
-          });
-        } else if (file.type.includes('text') || file.type.includes('json') || file.type.includes('csv')) {
-          try {
-            const decoded = atob(file.data.split(',')[1]);
-            const truncated = decoded.length > 10000 ? decoded.slice(0, 10000) + "... [truncated]" : decoded;
-            parts[0].text += `\n\n[File: ${file.name}]\n${truncated}`;
-          } catch (e) {
-            console.warn(`Failed to decode file ${file.name}`, e);
-          }
-        }
-      });
-    }
-
-    return {
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts
-    };
-  });
-
-  const tools: any[] = [];
-  
-  if (settings.customTools) {
-    if (settings.customTools.includes('web_search')) tools.push({ googleSearch: {} });
-    if (settings.customTools.includes('maps')) tools.push({ googleMaps: {} });
-  } else {
-    if (settings.searchEnabled) {
-      tools.push({ googleSearch: {} });
-    }
-    if (isGemini25 && !settings.searchEnabled) {
-      tools.push({ googleMaps: {} });
-    }
-  }
-  
-  const functionDeclarations = [MODIFY_CANVAS_TOOL];
-  if (settings.customTools?.includes('fetch_tickets')) {
-    functionDeclarations.push(FETCH_TICKETS_TOOL);
-  }
-  tools.push({ functionDeclarations });
-
-  const config: any = {
-    systemInstruction: systemInstruction,
-    temperature: 0.7,
-    tools,
-    toolConfig: {
-      includeServerSideToolInvocations: true
-    }
-  };
-
-  if (location) {
-    config.toolConfig.retrievalConfig = {
-      latLng: location
-    };
-  }
-
   try {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        messages, 
+        settings, 
+        modelId: settings.modelId,
+        searchEnabled: settings.searchEnabled,
+        libraryContext: (settings.libraryContext || "") + agentContext
+      })
+    });
+    if (!response.ok) throw new Error('Failed to generate response');
+    const data = await response.json();
+    return { text: data.text, sources: data.sources || [], agentDiscussion };
+  } catch (error: any) {
+    console.warn("Primary APIs (OpenAI/Anthropic) failed, falling back to Gemini...", error);
+    
+    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('All AI providers failed and Gemini API key is missing.');
+    }
+    const ai = new GoogleGenAI({ apiKey });
+    
+    const isGemini25 = settings.modelId.includes('gemini-2.5');
+
+    const systemInstruction = settings.customSystemInstruction || ((SYSTEM_INSTRUCTION_BASE
+      .replace('{TONE}', settings.tone)
+      .replace('{VOICE}', settings.voice)) 
+      + (settings.libraryContext ? `\n\n[Workspace Library Context]:\n${settings.libraryContext}` : '')
+      + (agentContext ? `\n\n[Agentic Swarm Results]:\n${agentContext}` : '')
+      + (settings.isSuperAdminModeActive ? SUPER_ADMIN_INSTRUCTION : ''));
+
+    // Limit history to last 10 messages
+    const historyLimit = 10;
+    const limitedMessages = messages.length > historyLimit 
+      ? messages.slice(-historyLimit) 
+      : messages;
+
+    const contents = limitedMessages.map(m => {
+      const parts: any[] = [{ text: m.content || " " }];
+      
+      if (m.files) {
+        m.files.forEach(file => {
+          if (file.type.startsWith('image/') || file.type.startsWith('audio/')) {
+            parts.push({
+              inlineData: {
+                data: file.data.split(',')[1], // Remove prefix
+                mimeType: file.type
+              }
+            });
+          } else if (file.type.includes('text') || file.type.includes('json') || file.type.includes('csv')) {
+            try {
+              const decoded = atob(file.data.split(',')[1]);
+              const truncated = decoded.length > 10000 ? decoded.slice(0, 10000) + "... [truncated]" : decoded;
+              parts[0].text += `\n\n[File: ${file.name}]\n${truncated}`;
+            } catch (e) {
+              console.warn(`Failed to decode file ${file.name}`, e);
+            }
+          }
+        });
+      }
+
+      return {
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts
+      };
+    });
+
+    const tools: any[] = [];
+    
+    if (settings.customTools) {
+      if (settings.customTools.includes('web_search')) tools.push({ googleSearch: {} });
+      if (settings.customTools.includes('maps')) tools.push({ googleMaps: {} });
+    } else {
+      if (settings.searchEnabled) {
+        tools.push({ googleSearch: {} });
+      }
+      if (isGemini25 && !settings.searchEnabled) {
+        tools.push({ googleMaps: {} });
+      }
+    }
+    
+    const functionDeclarations = [MODIFY_CANVAS_TOOL];
+    if (settings.customTools?.includes('fetch_tickets')) {
+      functionDeclarations.push(FETCH_TICKETS_TOOL);
+    }
+    tools.push({ functionDeclarations });
+
+    const config: any = {
+      systemInstruction: systemInstruction,
+      temperature: 0.7,
+      tools,
+      toolConfig: {
+        includeServerSideToolInvocations: true
+      }
+    };
+
+    if (location) {
+      config.toolConfig.retrievalConfig = {
+        latLng: location
+      };
+    }
+
     const response = await ai.models.generateContent({
-      model: settings.modelId as any,
+      model: "gemini-3.1-pro-preview",
       contents,
       config,
     });
@@ -479,23 +467,6 @@ export async function generateChatResponse(
     const functionCalls = response.functionCalls;
 
     return { text, sources, agentDiscussion, functionCalls };
-  } catch (error: any) {
-    console.warn("Gemini API failed, attempting fallback...", error);
-    const fallbackModel = "gpt-4o";
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        messages, 
-        settings, 
-        modelId: fallbackModel,
-        searchEnabled: settings.searchEnabled,
-        libraryContext: (settings.libraryContext || "") + agentContext
-      })
-    });
-    if (!response.ok) throw new Error('Failed to generate response with fallback');
-    const data = await response.json();
-    return { text: data.text, sources: data.sources || [], agentDiscussion };
   }
 }
 

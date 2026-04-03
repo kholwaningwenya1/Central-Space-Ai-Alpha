@@ -109,6 +109,8 @@ const TRENDING_QUERIES = [
   "Analyze the cultural significance of the Renaissance period"
 ];
 
+import { StandaloneBot } from './components/StandaloneBot';
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -121,6 +123,18 @@ export default function App() {
   const [pendingFiles, setPendingFiles] = useState<FileData[]>([]);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const [standaloneBotId, setStandaloneBotId] = useState<string | null>(null);
+
+  // Check URL for standalone bot
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path.startsWith('/bot/')) {
+      const botId = path.split('/')[2];
+      if (botId) {
+        setStandaloneBotId(botId);
+      }
+    }
+  }, []);
   const [isLiveModeOpen, setIsLiveModeOpen] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
@@ -167,11 +181,23 @@ export default function App() {
   // Check for API key on mount
   useEffect(() => {
     const checkApiKey = async () => {
+      const hasSeenPopup = sessionStorage.getItem('hasSeenApiKeyPopup');
+      
       if (window.aistudio?.hasSelectedApiKey) {
         const hasKey = await window.aistudio.hasSelectedApiKey();
         setHasApiKey(hasKey);
       } else if (!process.env.GEMINI_API_KEY && !process.env.API_KEY) {
-        setHasApiKey(false);
+        if (!hasSeenPopup) {
+          setHasApiKey(false);
+          sessionStorage.setItem('hasSeenApiKeyPopup', 'true');
+          
+          // Auto-dismiss after 6 seconds
+          setTimeout(() => {
+            setHasApiKey(true);
+          }, 6000);
+        } else {
+          setHasApiKey(true); // Don't show again
+        }
       }
     };
     checkApiKey();
@@ -1859,6 +1885,10 @@ export default function App() {
         <Toaster position="top-right" />
       </>
     );
+  }
+
+  if (standaloneBotId) {
+    return <StandaloneBot botId={standaloneBotId} />;
   }
 
   return (

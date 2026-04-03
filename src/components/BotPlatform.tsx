@@ -50,6 +50,7 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
   const [isCreating, setIsCreating] = useState(false);
   const [editingBotId, setEditingBotId] = useState<string | null>(null);
   const [viewingBot, setViewingBot] = useState<Bot | null>(null);
+  const [deployingBot, setDeployingBot] = useState<Bot | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'discover' | 'my-bots'>('discover');
   const [modalTab, setModalTab] = useState<'config' | 'test'>('config');
@@ -690,6 +691,16 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
                               Add to Session
                             </>
                           )}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeployingBot(bot);
+                          }}
+                          className="p-3 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-2xl border border-blue-100 transition-all shadow-sm"
+                          title="Deploy & Share"
+                        >
+                          <Globe className="w-4 h-4" />
                         </button>
                         {bot.creatorId === currentUserId && (
                           <button
@@ -1528,6 +1539,131 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
                     </>
                   )}
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Deploy Bot Modal */}
+      <AnimatePresence>
+        {deployingBot && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-zinc-950/40 backdrop-blur-sm"
+              onClick={() => setDeployingBot(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="flex items-center justify-between p-6 border-b border-zinc-100 bg-zinc-50/50">
+                <div>
+                  <h2 className="text-2xl font-bold text-zinc-950 tracking-tight">Deploy & Share</h2>
+                  <p className="text-sm text-zinc-500 mt-1">Share {deployingBot.name} with the world</p>
+                </div>
+                <button
+                  onClick={() => setDeployingBot(null)}
+                  className="p-2 text-zinc-400 hover:text-zinc-950 hover:bg-zinc-100 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-8 overflow-y-auto space-y-8">
+                {/* Direct Link */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-bold text-zinc-950 uppercase tracking-wider flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-blue-500" />
+                    Direct Link
+                  </h3>
+                  <p className="text-sm text-zinc-500">Share this link for users to chat directly with your bot.</p>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      readOnly 
+                      value={`${window.location.origin}/bot/${deployingBot.id}`}
+                      className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm text-zinc-600 font-mono focus:outline-none"
+                    />
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/bot/${deployingBot.id}`);
+                        toast.success('Link copied to clipboard!');
+                      }}
+                      className="px-6 py-3 bg-zinc-950 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 transition-colors"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+
+                {/* Embed Code */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-bold text-zinc-950 uppercase tracking-wider flex items-center gap-2">
+                    <Code className="w-4 h-4 text-emerald-500" />
+                    Embed on Website
+                  </h3>
+                  <p className="text-sm text-zinc-500">Paste this HTML snippet to embed the bot on your website.</p>
+                  <div className="relative">
+                    <textarea 
+                      readOnly 
+                      rows={4}
+                      value={`<iframe src="${window.location.origin}/bot/${deployingBot.id}?embed=true" width="100%" height="600px" frameborder="0" style="border-radius: 12px; border: 1px solid #e4e4e7;"></iframe>`}
+                      className="w-full bg-zinc-950 text-emerald-400 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-mono focus:outline-none resize-none"
+                    />
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText(`<iframe src="${window.location.origin}/bot/${deployingBot.id}?embed=true" width="100%" height="600px" frameborder="0" style="border-radius: 12px; border: 1px solid #e4e4e7;"></iframe>`);
+                        toast.success('Embed code copied!');
+                      }}
+                      className="absolute top-3 right-3 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold transition-colors backdrop-blur-sm"
+                    >
+                      Copy Code
+                    </button>
+                  </div>
+                </div>
+
+                {/* Directory Publication */}
+                <div className="space-y-3 pt-6 border-t border-zinc-100">
+                  <h3 className="text-sm font-bold text-zinc-950 uppercase tracking-wider flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-purple-500" />
+                    Publish to Directory
+                  </h3>
+                  <p className="text-sm text-zinc-500">Make your bot discoverable to other users in the workspace directory.</p>
+                  <div className="flex items-center justify-between p-4 bg-purple-50 rounded-xl border border-purple-100">
+                    <div>
+                      <p className="text-sm font-bold text-purple-900">Workspace Directory</p>
+                      <p className="text-xs text-purple-700 mt-0.5">Currently {deployingBot.isActive ? 'published' : 'private'}</p>
+                    </div>
+                    <button 
+                      onClick={async () => {
+                        try {
+                          await setDoc(doc(db, 'bots', deployingBot.id), {
+                            ...deployingBot,
+                            isActive: !deployingBot.isActive
+                          }, { merge: true });
+                          setDeployingBot({ ...deployingBot, isActive: !deployingBot.isActive });
+                          toast.success(deployingBot.isActive ? 'Bot removed from directory' : 'Bot published to directory!');
+                        } catch (error) {
+                          toast.error('Failed to update visibility');
+                        }
+                      }}
+                      className={cn(
+                        "px-4 py-2 rounded-lg text-sm font-bold transition-colors",
+                        deployingBot.isActive 
+                          ? "bg-white text-purple-600 border border-purple-200 hover:bg-purple-100"
+                          : "bg-purple-600 text-white hover:bg-purple-700"
+                      )}
+                    >
+                      {deployingBot.isActive ? 'Unpublish' : 'Publish'}
+                    </button>
+                  </div>
+                </div>
               </div>
             </motion.div>
           </div>
