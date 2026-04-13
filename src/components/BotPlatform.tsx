@@ -22,7 +22,12 @@ import {
   Upload,
   UserPlus,
   User,
-  Ticket
+  Ticket,
+  Link as LinkIcon,
+  FileText,
+  Music,
+  Users as UsersIcon,
+  MessageSquare
 } from 'lucide-react';
 import { Bot, Message, AIModel } from '../types';
 import { db, collection, onSnapshot, query, where, doc, setDoc, deleteDoc } from '../firebase';
@@ -66,7 +71,10 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
     username: '',
     description: '',
     systemInstruction: '',
-    modelId: 'gemini-3-flash-preview',
+    prompt: '',
+    websiteUrl: '',
+    files: [],
+    modelId: 'gpt-4o',
     commands: [{ command: 'start', description: 'Start the bot' }],
     tools: [],
     webhookUrl: '',
@@ -279,9 +287,12 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
       username: newBot.username!.startsWith('@') ? newBot.username! : `@${newBot.username}`,
       description: newBot.description || '',
       systemInstruction: newBot.systemInstruction!,
+      prompt: newBot.prompt || '',
+      websiteUrl: newBot.websiteUrl || '',
+      files: newBot.files || [],
       commands: newBot.commands || [],
       tools: newBot.tools || [],
-      modelId: newBot.modelId || 'gemini-3-flash-preview',
+      modelId: newBot.modelId || 'gpt-4o',
       webhookUrl: newBot.webhookUrl || '',
       avatar: newBot.avatar || '',
       creatorId: currentUserId,
@@ -302,7 +313,7 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
         username: '',
         description: '',
         systemInstruction: '',
-        modelId: 'gemini-3-flash-preview',
+        modelId: 'gpt-4o',
         commands: [{ command: 'start', description: 'Start the bot' }],
         tools: [],
         webhookUrl: '',
@@ -324,7 +335,10 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
       username: (bot.username || '').replace('@', ''),
       description: bot.description || '',
       systemInstruction: bot.systemInstruction || '',
-      modelId: bot.modelId || 'gemini-3-flash-preview',
+      prompt: bot.prompt || '',
+      websiteUrl: bot.websiteUrl || '',
+      files: bot.files || [],
+      modelId: bot.modelId || 'gpt-4o',
       commands: bot.commands || [],
       tools: bot.tools || [],
       webhookUrl: bot.webhookUrl || '',
@@ -347,7 +361,10 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
       username: template.username,
       description: template.description,
       systemInstruction: template.systemInstruction,
-      modelId: template.modelId || 'gemini-3-flash-preview',
+      prompt: template.prompt || '',
+      websiteUrl: template.websiteUrl || '',
+      files: template.files || [],
+      modelId: template.modelId || 'gpt-4o',
       tools: template.tools,
       commands: template.commands,
       avatar: template.avatar,
@@ -388,8 +405,11 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
         {
           tone: 'Professional',
           voice: 'First person',
-          modelId: newBot.modelId || 'gemini-3-flash-preview',
+          modelId: newBot.modelId || 'gpt-4o',
           customSystemInstruction: newBot.systemInstruction,
+          customPrompt: newBot.prompt,
+          customWebsiteUrl: newBot.websiteUrl,
+          customFiles: newBot.files,
           customTools: newBot.tools
         }
       );
@@ -456,12 +476,12 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert("Please upload an image file.");
+      toast.error("Please upload an image file.");
       return;
     }
 
     if (file.size > 500000) { // 500KB limit for base64 avatars
-      alert("Avatar image is too large. Please choose a file under 500KB.");
+      toast.error("Avatar image is too large. Please choose a file under 500KB.");
       return;
     }
 
@@ -470,6 +490,47 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
       setNewBot({ ...newBot, avatar: reader.result as string });
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleBotFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const uploadedFiles = e.target.files;
+    if (!uploadedFiles) return;
+
+    const plan = userProfile?.plan || 'free';
+    const maxFiles = plan === 'free' ? 5 : plan === 'standard' ? 20 : plan === 'advanced' ? 50 : 200;
+    const currentFiles = newBot.files || [];
+
+    if (currentFiles.length + uploadedFiles.length > maxFiles) {
+      toast.error(`Your ${plan} plan is limited to ${maxFiles} files per bot.`);
+      return;
+    }
+
+    // 500KB limit per file to avoid Firestore 1MB document limit
+    const MAX_FILE_SIZE = 500 * 1024; 
+
+    Array.from(uploadedFiles).forEach(file => {
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`File ${file.name} is too large. Maximum size is 500KB.`);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const fileData: any = {
+          id: Math.random().toString(36).substring(7),
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          data: reader.result as string,
+          timestamp: Date.now()
+        };
+        setNewBot(prev => ({
+          ...prev,
+          files: [...(prev.files || []), fileData]
+        }));
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleDeleteBot = async (botId: string) => {
@@ -915,11 +976,6 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
                     onChange={(e) => setNewBot({ ...newBot, modelId: e.target.value as AIModel })}
                     className="w-full bg-zinc-50 border border-zinc-100 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-950/10 transition-all appearance-none cursor-pointer"
                   >
-                    <optgroup label="Google" className="bg-white">
-                      <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
-                      <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
-                      <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                    </optgroup>
                     <optgroup label="OpenAI" className="bg-white">
                       <option value="gpt-4o">GPT-4o</option>
                       <option value="gpt-4o-mini">GPT-4o Mini</option>
@@ -1072,6 +1128,79 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
                       </div>
                     ))}
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1 flex items-center gap-2">
+                    <LinkIcon className="w-3 h-3" />
+                    Website Link (Knowledge Base)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://yourwebsite.com"
+                    value={newBot.websiteUrl || ''}
+                    onChange={(e) => setNewBot({ ...newBot, websiteUrl: e.target.value })}
+                    className="w-full bg-zinc-50 border border-zinc-100 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-950/10 transition-all"
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between px-1">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Knowledge Base Files</label>
+                    <label className="text-[10px] font-bold text-zinc-950 hover:underline uppercase tracking-widest cursor-pointer">
+                      + Upload Files
+                      <input
+                        type="file"
+                        multiple
+                        onChange={handleBotFileUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {newBot.files?.map((file, idx) => (
+                      <div key={file.id} className="flex items-center gap-3 p-3 bg-zinc-50 border border-zinc-100 rounded-xl group relative">
+                        <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shrink-0 shadow-sm">
+                          {file.type.includes('image') ? <ImageIcon className="w-4 h-4 text-zinc-400" /> :
+                           file.type.includes('audio') ? <Music className="w-4 h-4 text-zinc-400" /> :
+                           file.type.includes('contact') ? <UsersIcon className="w-4 h-4 text-zinc-400" /> :
+                           <FileText className="w-4 h-4 text-zinc-400" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] font-bold text-zinc-900 truncate">{file.name}</div>
+                          <div className="text-[8px] text-zinc-400">{(file.size / 1024).toFixed(1)} KB</div>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            const updated = newBot.files?.filter((_, i) => i !== idx);
+                            setNewBot({ ...newBot, files: updated });
+                          }}
+                          className="absolute top-2 right-2 p-1 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                    {(!newBot.files || newBot.files.length === 0) && (
+                      <div className="col-span-2 py-8 text-center bg-zinc-50 border border-dashed border-zinc-200 rounded-2xl">
+                        <p className="text-[10px] text-zinc-400 font-medium">No files uploaded yet. Add documents, images, or audio.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1 flex items-center gap-2">
+                    <MessageSquare className="w-3 h-3" />
+                    Task Prompt / Instructions
+                  </label>
+                  <textarea
+                    placeholder="Give the bot specific data or instructions to use when performing tasks..."
+                    value={newBot.prompt || ''}
+                    onChange={(e) => setNewBot({ ...newBot, prompt: e.target.value })}
+                    className="w-full bg-zinc-50 border border-zinc-100 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-950/10 transition-all min-h-[100px] resize-none"
+                  />
+                  <p className="text-[10px] text-zinc-400 px-1 italic">This data will be used by the bot to perform its assigned tasks.</p>
                 </div>
 
                 <div className="space-y-2">

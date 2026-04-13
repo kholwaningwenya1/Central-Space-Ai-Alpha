@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Message } from '../types';
+import { Bot, Message, Tone } from '../types';
 import { db, doc, onSnapshot } from '../firebase';
 import { generateChatResponseStream } from '../services/aiService';
 import { Send, Loader2, Bot as BotIcon } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export function StandaloneBot({ botId }: { botId: string }) {
   const [bot, setBot] = useState<Bot | null>(null);
@@ -43,12 +44,18 @@ export function StandaloneBot({ botId }: { botId: string }) {
     setIsLoading(true);
 
     try {
-      const chatHistory = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }));
+      const chatHistory = [...messages, userMsg].map(m => ({ 
+        role: (m.role === 'user' || m.role === 'assistant') ? m.role : 'user', 
+        content: m.content 
+      }));
       const { responseStream } = await generateChatResponseStream(chatHistory, {
-        tone: bot.tone || 'Professional',
+        tone: (bot.tone as Tone) || 'Professional',
         voice: 'Second person',
-        modelId: bot.modelId || 'gemini-3-flash-preview',
+        modelId: bot.modelId || 'gpt-4o',
         customSystemInstruction: bot.systemInstruction,
+        customPrompt: bot.prompt,
+        customWebsiteUrl: bot.websiteUrl,
+        customFiles: bot.files,
         customTools: bot.tools
       });
 
@@ -75,12 +82,16 @@ export function StandaloneBot({ botId }: { botId: string }) {
   return (
     <div className="flex flex-col h-screen bg-white">
       <div className="flex items-center gap-3 p-4 border-b border-zinc-100 bg-zinc-50/50">
-        <div className="w-10 h-10 rounded-xl bg-zinc-950 flex items-center justify-center text-white">
-          <BotIcon className="w-5 h-5" />
+        <div className="w-10 h-10 rounded-xl bg-zinc-950 flex items-center justify-center text-white overflow-hidden shadow-sm">
+          {bot.avatar ? (
+            <img src={bot.avatar} alt={bot.name} className="w-full h-full object-cover" />
+          ) : (
+            <BotIcon className="w-5 h-5" />
+          )}
         </div>
         <div>
-          <h1 className="font-bold text-zinc-950">{bot.name}</h1>
-          <p className="text-xs text-zinc-500">{bot.username}</p>
+          <h1 className="font-bold text-zinc-950 tracking-tight">{bot.name}</h1>
+          <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">{bot.username}</p>
         </div>
       </div>
       
@@ -94,13 +105,25 @@ export function StandaloneBot({ botId }: { botId: string }) {
         ))}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-zinc-100 rounded-2xl px-4 py-3"><Loader2 className="w-4 h-4 animate-spin text-zinc-500" /></div>
+            <div className="bg-zinc-100 rounded-2xl px-5 py-4 flex items-center gap-3">
+              <div className="flex gap-1">
+                {[0, 1, 2].map((i) => (
+                  <motion.div
+                    key={i}
+                    animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                    className="w-2 h-2 rounded-full bg-zinc-400"
+                  />
+                ))}
+              </div>
+              <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Thinking</span>
+            </div>
           </div>
         )}
       </div>
 
       <div className="p-4 border-t border-zinc-100">
-        <div className="flex gap-2 max-w-4xl mx-auto">
+        <div className="flex gap-2 max-w-4xl mx-auto items-center">
           <input
             type="text"
             value={input}

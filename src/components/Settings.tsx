@@ -240,9 +240,10 @@ export function Settings({
                     onChange={(e) => onUpdateSession?.(session.id, { modelId: e.target.value as AIModel })}
                     className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4 px-5 text-sm text-zinc-900 focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:bg-white focus:border-zinc-950 transition-all font-bold appearance-none cursor-pointer"
                   >
-                    <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
-                    <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
-                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                    <option value="gpt-4o">GPT-4o</option>
+                    <option value="gpt-4o-mini">GPT-4o Mini</option>
+                    <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
+                    <option value="claude-3-opus">Claude 3 Opus</option>
                   </select>
                 </div>
                 <div className="space-y-3">
@@ -431,6 +432,78 @@ export function Settings({
                       <div className="absolute top-1 w-5 h-5 bg-white rounded-full transition-all shadow-sm left-8" />
                     </button>
                   </div>
+
+                  <div className="flex items-center justify-between p-6 bg-zinc-50 rounded-3xl border border-zinc-100">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center">
+                        <MessageSquare className="w-6 h-6 text-indigo-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-zinc-900 uppercase tracking-tight">OmniBot Assistant</h4>
+                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Show floating AI assistant</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => onUpdateUserSettings?.({ omniBotEnabled: !userSettings?.omniBotEnabled })}
+                      className={cn(
+                        "w-14 h-7 rounded-full relative transition-all",
+                        userSettings?.omniBotEnabled ? "bg-indigo-500 shadow-lg shadow-indigo-500/20" : "bg-zinc-300"
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-1 w-5 h-5 bg-white rounded-full transition-all shadow-sm",
+                        userSettings?.omniBotEnabled ? "left-8" : "left-1"
+                      )} />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-6 bg-zinc-50 rounded-3xl border border-zinc-100">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-orange-100 rounded-2xl flex items-center justify-center">
+                        <Volume2 className="w-6 h-6 text-orange-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-zinc-900 uppercase tracking-tight">Auto Read Out Loud</h4>
+                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Read translations automatically</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => onUpdateUserSettings?.({ autoReadOutLoud: !userSettings?.autoReadOutLoud })}
+                      className={cn(
+                        "w-14 h-7 rounded-full relative transition-all",
+                        userSettings?.autoReadOutLoud ? "bg-orange-500 shadow-lg shadow-orange-500/20" : "bg-zinc-300"
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-1 w-5 h-5 bg-white rounded-full transition-all shadow-sm",
+                        userSettings?.autoReadOutLoud ? "left-8" : "left-1"
+                      )} />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-6 bg-zinc-50 rounded-3xl border border-zinc-100">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-cyan-100 rounded-2xl flex items-center justify-center">
+                        <Zap className="w-6 h-6 text-cyan-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-zinc-900 uppercase tracking-tight">Auto Generate Audio</h4>
+                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Create audio files for translations</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => onUpdateUserSettings?.({ autoGenerateAudio: !userSettings?.autoGenerateAudio })}
+                      className={cn(
+                        "w-14 h-7 rounded-full relative transition-all",
+                        userSettings?.autoGenerateAudio ? "bg-cyan-500 shadow-lg shadow-cyan-500/20" : "bg-zinc-300"
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-1 w-5 h-5 bg-white rounded-full transition-all shadow-sm",
+                        userSettings?.autoGenerateAudio ? "left-8" : "left-1"
+                      )} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -443,18 +516,12 @@ export function Settings({
               <div className="space-y-8">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-black text-zinc-950 uppercase tracking-tight">API Key Management</h3>
-                  <button 
-                    onClick={() => window.aistudio?.openSelectKey?.()}
-                    className="px-4 py-2 bg-zinc-950 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition-all"
-                  >
-                    Change Key
-                  </button>
                 </div>
                 <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <Key className="w-5 h-5 text-zinc-400" />
-                      <span className="text-sm font-bold text-zinc-600">Gemini API Key</span>
+                      <span className="text-sm font-bold text-zinc-600">OpenAI API Key</span>
                     </div>
                     <button 
                       onClick={() => setShowApiKey(!showApiKey)}
@@ -464,7 +531,7 @@ export function Settings({
                     </button>
                   </div>
                   <div className="bg-white border border-zinc-200 rounded-xl p-3 font-mono text-xs text-zinc-500 overflow-hidden text-ellipsis">
-                    {showApiKey ? (process.env.GEMINI_API_KEY || process.env.API_KEY || 'Not configured') : '••••••••••••••••••••••••••••••'}
+                    {showApiKey ? (process.env.OPENAI_API_KEY || 'Not configured') : '••••••••••••••••••••••••••••••'}
                   </div>
                   <p className="text-[10px] text-zinc-400 font-medium">Your API key is stored securely and never exposed to the public.</p>
                 </div>

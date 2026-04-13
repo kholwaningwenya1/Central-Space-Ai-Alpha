@@ -24,7 +24,8 @@ import {
   Users2,
   UserPlus,
   Bot as BotIcon,
-  CreditCard
+  CreditCard,
+  Ruler
 } from 'lucide-react';
 import { Tone, Voice, AIModel, WorkspaceSession, SessionMode, Presence, ConversationType, ResultType } from '../types';
 import { cn } from '../lib/utils';
@@ -58,16 +59,12 @@ interface SidebarProps {
 }
 
 const MODELS: { id: AIModel; name: string; provider: string; description: string; minPlan?: string }[] = [
-  { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', provider: 'Google', description: 'Most capable model for complex reasoning', minPlan: 'standard' },
-  { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash', provider: 'Google', description: 'Fast and efficient for daily tasks' },
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', description: 'Balanced performance and speed' },
   { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI', description: 'High-intelligence flagship model', minPlan: 'standard' },
   { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'OpenAI', description: 'Fast, affordable small model' },
   { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'Anthropic', description: 'Excellent for coding and nuance', minPlan: 'advanced' },
   { id: 'claude-3-opus', name: 'Claude 3 Opus', provider: 'Anthropic', description: 'Powerful model for complex tasks', minPlan: 'advanced' },
 ];
 
-import { GoogleGenAI } from "@google/genai";
 import { toast } from 'sonner';
 
 export function Sidebar({ 
@@ -140,39 +137,23 @@ export function Sidebar({
     setIsSummarizing(true);
     
     try {
-      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-      if (!apiKey) {
-        throw new Error('Gemini API key is missing. Please check your configuration.');
-      }
-      const ai = new GoogleGenAI({ apiKey });
       const history = currentSession.messages.map(m => `${m.role}: ${m.content}`).join('\n');
-      
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [{ parts: [{ text: `Summarize this workspace session in 3-5 bullet points focusing on key decisions and actions:\n\n${history}` }] }]
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: `Summarize this workspace session in 3-5 bullet points focusing on key decisions and actions:\n\n${history}` }],
+          settings: { modelId: 'gpt-4o-mini', customSystemInstruction: "You are a helpful assistant that provides concise summaries." },
+          modelId: 'gpt-4o-mini',
+          searchEnabled: false
+        })
       });
-      setSummary(response.text || "Could not generate summary.");
+      if (!response.ok) throw new Error('Summary failed');
+      const data = await response.json();
+      setSummary(data.text || "Could not generate summary.");
     } catch (error) {
-      console.warn("Gemini summary failed, attempting fallback...", error);
-      try {
-        const history = currentSession.messages.map(m => `${m.role}: ${m.content}`).join('\n');
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: [{ role: 'user', content: `Summarize this workspace session in 3-5 bullet points focusing on key decisions and actions:\n\n${history}` }],
-            settings: { modelId: 'gpt-4o-mini', customSystemInstruction: "You are a helpful assistant that provides concise summaries." },
-            modelId: 'gpt-4o-mini',
-            searchEnabled: false
-          })
-        });
-        if (!response.ok) throw new Error('Fallback summary failed');
-        const data = await response.json();
-        setSummary(data.text || "Could not generate summary.");
-      } catch (fallbackError) {
-        console.error("Summary failed:", fallbackError);
-        setSummary("Failed to generate summary. Please try again.");
-      }
+      console.error("Summary failed:", error);
+      setSummary("Failed to generate summary. Please try again.");
     } finally {
       setIsSummarizing(false);
     }
@@ -188,14 +169,17 @@ export function Sidebar({
   return (
     <aside 
       className={cn(
-        "bg-zinc-950 border-r border-zinc-800/50 flex flex-col transition-all duration-500 relative z-30 h-screen font-sans",
-        isCollapsed ? "w-20" : "w-80"
+        "bg-zinc-950 border-r border-zinc-800/50 flex flex-col transition-all duration-300 h-screen font-sans",
+        "fixed inset-y-0 left-0 z-50 lg:relative lg:z-30",
+        isCollapsed 
+          ? "-translate-x-full lg:translate-x-0 lg:w-20" 
+          : "translate-x-0 w-[280px] sm:w-80"
       )}
     >
       {/* Collapse Toggle */}
       <button 
         onClick={onToggleCollapse}
-        className="absolute -right-3 top-24 w-6 h-6 bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center text-zinc-500 hover:text-white shadow-xl z-50 transition-all hover:scale-110"
+        className="absolute -right-3 top-24 w-6 h-6 bg-zinc-900 border border-zinc-800 rounded-full hidden lg:flex items-center justify-center text-zinc-500 hover:text-white shadow-xl z-50 transition-all hover:scale-110"
       >
         {isCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
       </button>
@@ -204,8 +188,8 @@ export function Sidebar({
       <div className={cn("p-6 flex flex-col gap-6 shrink-0", isCollapsed && "px-4 items-center")}>
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-white/5">
-              <Sparkles className="w-5 h-5 text-zinc-950" />
+            <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-white/5 overflow-hidden">
+              <img src="/logo.png" alt="Central Space Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </div>
             {!isCollapsed && (
               <div className="flex flex-col">
@@ -256,6 +240,7 @@ export function Sidebar({
             { id: 'directory', icon: UserPlus, label: 'Directory' },
             { id: 'bots', icon: BotIcon, label: 'Bot Platform' },
             { id: 'document', icon: FileText, label: 'Document Editor', requiredPlan: 'standard' },
+            { id: 'blueprint', icon: Ruler, label: 'Blueprint Gen', requiredPlan: 'advanced' },
             { id: 'canvas', icon: Palette, label: 'Visual Canvas', requiredPlan: 'advanced' },
             { id: 'library', icon: LibraryIcon, label: 'File Library' },
             { id: 'settings', icon: Settings, label: 'Settings' },

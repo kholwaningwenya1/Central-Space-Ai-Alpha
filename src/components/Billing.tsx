@@ -36,8 +36,16 @@ const PLANS = [
     id: 'corporate' as SubscriptionPlan,
     name: 'Corporate',
     price: 49.99,
-    description: 'For teams and organizations',
-    features: ['Unlimited everything', 'Priority support', 'Whitelisting', 'Custom domain', 'Dedicated resources']
+    description: 'Comprehensive solution for teams and organizations',
+    features: [
+      'Unlimited everything',
+      'Priority 24/7 support',
+      'SSO & SAML Integration (Manual Setup)',
+      'Advanced Team Management (Manual Setup)',
+      'Audit Logs & Analytics (On Request)',
+      'Custom Domain & Whitelisting (Manual Setup)',
+      'Dedicated Account Manager'
+    ]
   }
 ];
 
@@ -129,6 +137,19 @@ export function Billing({ userProfile, onPlanUpdate }: BillingProps) {
               </button>
             ) : (
               <div className="space-y-4">
+                <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 mb-4">
+                  <h4 className="text-[10px] font-black text-zinc-950 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <CreditCard className="w-3 h-3" /> Payment Options
+                  </h4>
+                  <div className="space-y-2">
+                    <div className="text-[10px] text-zinc-500 leading-tight">
+                      <span className="font-bold text-zinc-900 uppercase">Debit or Credit Card:</span> Pay securely using your Visa, Mastercard, or Amex via our encrypted gateway.
+                    </div>
+                    <div className="text-[10px] text-zinc-500 leading-tight">
+                      <span className="font-bold text-zinc-900 uppercase">Pay Later:</span> Split your payment into interest-free installments (Available via PayPal in select regions).
+                    </div>
+                  </div>
+                </div>
                 <PayPalScriptProvider options={{ clientId: process.env.VITE_PAYPAL_CLIENT_ID || "test" }}>
                   <PayPalButtons
                     style={{ layout: "vertical", shape: "pill", label: "subscribe" }}
@@ -162,19 +183,40 @@ export function Billing({ userProfile, onPlanUpdate }: BillingProps) {
 
       <div className="bg-zinc-950 rounded-[2.5rem] p-12 text-white overflow-hidden relative">
         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-10">
-          <div className="max-w-xl space-y-4">
+          <div className="max-w-xl space-y-6">
             <h2 className="text-3xl font-black tracking-tighter uppercase italic">Need a custom solution?</h2>
             <p className="text-zinc-400 text-sm font-medium leading-relaxed">
               For large organizations requiring custom integrations, dedicated support, and advanced security features, our Enterprise team is ready to help.
             </p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Email Support</span>
+                <div className="flex flex-col gap-1">
+                  <a href="mailto:centralspace00@gmail.com" className="text-xs font-medium text-white hover:text-emerald-400 transition-colors">centralspace00@gmail.com</a>
+                  <a href="mailto:kholwani141@gmail.com" className="text-xs font-medium text-white hover:text-emerald-400 transition-colors">kholwani141@gmail.com</a>
+                  <a href="mailto:central46labs@gmail.com" className="text-xs font-medium text-white hover:text-emerald-400 transition-colors">central46labs@gmail.com</a>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Direct Contact</span>
+                <div className="flex flex-col gap-1">
+                  <a href="tel:+263782524097" className="text-xs font-medium text-white hover:text-emerald-400 transition-colors">Call: +263 782 524 097</a>
+                  <a href="https://wa.me/+263777315944" target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1">
+                    WhatsApp: +263 777 315 944
+                  </a>
+                </div>
+              </div>
+            </div>
+
             <button 
-              onClick={() => window.location.href = 'mailto:sales@example.com'}
-              className="px-8 py-4 bg-white text-zinc-950 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-zinc-200 transition-all"
+              onClick={() => window.location.href = 'mailto:centralspace00@gmail.com'}
+              className="px-8 py-4 bg-white text-zinc-950 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-zinc-200 transition-all shadow-xl shadow-white/5"
             >
               Contact Sales
             </button>
           </div>
-          <div className="w-48 h-48 bg-white/5 rounded-[3rem] flex items-center justify-center rotate-12 border border-white/10">
+          <div className="w-48 h-48 bg-white/5 rounded-[3rem] flex items-center justify-center rotate-12 border border-white/10 shrink-0">
             <Shield className="w-24 h-24 text-white/20" />
           </div>
         </div>

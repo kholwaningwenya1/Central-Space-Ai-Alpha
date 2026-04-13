@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { FileData } from '../types';
-import { File, FileText, FileSpreadsheet, Image, Video, Trash2, Download, Search, Plus, X } from 'lucide-react';
+import { File, FileText, FileSpreadsheet, Image, Video, Trash2, Download, Search, Plus, X, MessageSquare } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface LibraryProps {
   files: FileData[];
   onDelete: (id: string) => void;
   onUpload: (files: FileList) => void;
+  onChatWithLibrary?: () => void;
 }
 
-export function Library({ files, onDelete, onUpload }: LibraryProps) {
+export function Library({ files, onDelete, onUpload, onChatWithLibrary }: LibraryProps) {
   const [search, setSearch] = useState('');
 
   const filteredFiles = files.filter(f => 
@@ -42,6 +43,15 @@ export function Library({ files, onDelete, onUpload }: LibraryProps) {
             <p className="text-zinc-500 text-sm">Manage and search all files in this workspace.</p>
           </div>
           <div className="flex items-center gap-4">
+            {onChatWithLibrary && files.length > 0 && (
+              <button 
+                onClick={onChatWithLibrary}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-sm font-medium hover:bg-emerald-100 transition-colors"
+              >
+                <MessageSquare className="w-4 h-4" />
+                Chat with Library
+              </button>
+            )}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
               <input

@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
-    "@google/genai": "^1.29.0",
+    "@google/genai": "^1.48.0",
     "@paypal/react-paypal-js": "^9.0.2",
     "@tailwindcss/vite": "^4.1.14",
     "@types/papaparse": "^5.5.2",
@@ -40,6 +40,7 @@
     "react-konva": "^19.2.3",
     "react-markdown": "^10.1.0",
     "react-simple-code-editor": "^0.14.1",
+    "remark-gfm": "^4.0.1",
     "serpapi": "^2.2.1",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",

@@ -50,17 +50,6 @@ export function MediaHub({ onSaveToLibrary }: MediaHubProps) {
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
-    
-    // Check for API key if generating video
-    if (type === 'video' && window.aistudio?.hasSelectedApiKey) {
-      const hasKey = await window.aistudio.hasSelectedApiKey();
-      if (!hasKey) {
-        if (window.aistudio?.openSelectKey) {
-          await window.aistudio.openSelectKey();
-          return; // Stop and wait for user to select key
-        }
-      }
-    }
 
     setIsGenerating(true);
     setResult(null);
@@ -71,7 +60,7 @@ export function MediaHub({ onSaveToLibrary }: MediaHubProps) {
         const url = await generateImageFromPrompt(fullPrompt, { aspectRatio });
         setResult(url);
       } else {
-        const url = await generateVideoFromPrompt(fullPrompt, { resolution, aspectRatio }, { collaborate });
+        const url = await generateVideoFromPrompt(fullPrompt, { resolution, aspectRatio });
         setResult(url);
       }
     } catch (err: any) {

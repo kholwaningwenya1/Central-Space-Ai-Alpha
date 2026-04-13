@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 
 dotenv.config();
 
@@ -15,6 +16,7 @@ const __dirname = path.dirname(__filename);
 
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) : null;
+const genAI = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
 
 async function startServer() {
   const app = express();
@@ -118,24 +120,30 @@ async function startServer() {
 
   // AI Proxy Routes
   app.post("/api/chat", async (req, res) => {
-    const { messages, settings, modelId, searchEnabled, libraryContext } = req.body;
+    const { messages, settings, modelId = 'gpt-4o', searchEnabled, libraryContext } = req.body;
+
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: "Messages are required and must be a non-empty array" });
+    }
 
     try {
       let searchContext = "";
       if (searchEnabled && process.env.SERPAPI_API_KEY) {
         const lastMessage = messages[messages.length - 1].content;
-        try {
-          const serpResponse = await fetch(`https://serpapi.com/search.json?q=${encodeURIComponent(lastMessage)}&api_key=${process.env.SERPAPI_API_KEY}`);
-          const serpData = await serpResponse.json();
-          if (serpData.organic_results && serpData.organic_results.length > 0) {
-            searchContext = "\n\n[Web Search Results]:\n" + serpData.organic_results.slice(0, 3).map((r: any) => `- ${r.title}: ${r.snippet} (${r.link})`).join("\n");
+        if (lastMessage) {
+          try {
+            const serpResponse = await fetch(`https://serpapi.com/search.json?q=${encodeURIComponent(lastMessage)}&api_key=${process.env.SERPAPI_API_KEY}`);
+            const serpData = await serpResponse.json();
+            if (serpData.organic_results && serpData.organic_results.length > 0) {
+              searchContext = "\n\n[Web Search Results]:\n" + serpData.organic_results.slice(0, 3).map((r: any) => `- ${r.title}: ${r.snippet} (${r.link})`).join("\n");
+            }
+          } catch (e) {
+            console.error("SerpAPI search failed:", e);
           }
-        } catch (e) {
-          console.error("SerpAPI search failed:", e);
         }
       }
 
-      const systemPrompt = (settings.customSystemInstruction || "You are a helpful assistant.") + (libraryContext ? `\n\n[Workspace Library Context]:\n${libraryContext}` : "") + searchContext;
+      const systemPrompt = (settings?.customSystemInstruction || "You are a helpful assistant.") + (libraryContext ? `\n\n[Workspace Library Context]:\n${libraryContext}` : "") + searchContext;
 
       let responseText = "";
 
@@ -145,7 +153,21 @@ async function startServer() {
           model: model,
           messages: [
             { role: 'system', content: systemPrompt },
-            ...messages.map((m: any) => ({ role: m.role, content: m.content }))
+            ...messages.map((m: any) => {
+              if (m.files && m.files.length > 0) {
+                const content: any[] = [{ type: 'text', text: m.content || " " }];
+                m.files.forEach((f: any) => {
+                  if (f.type.startsWith('image/')) {
+                    content.push({
+                      type: 'image_url',
+                      image_url: { url: f.data }
+                    });
+                  }
+                });
+                return { role: m.role, content };
+              }
+              return { role: m.role, content: m.content };
+            })
           ],
           temperature: 0.7,
         });
@@ -158,39 +180,114 @@ async function startServer() {
           model: model,
           max_tokens: 4096,
           system: systemPrompt,
-          messages: messages.map((m: any) => ({ role: m.role, content: m.content }))
+          messages: messages.map((m: any) => {
+            if (m.files && m.files.length > 0) {
+              const content: any[] = [{ type: 'text', text: m.content || " " }];
+              m.files.forEach((f: any) => {
+                if (f.type.startsWith('image/')) {
+                  const base64Data = f.data.split(',')[1];
+                  content.push({
+                    type: 'image',
+                    source: {
+                      type: 'base64',
+                      media_type: f.type,
+                      data: base64Data
+                    }
+                  });
+                }
+              });
+              return { role: m.role, content };
+            }
+            return { role: m.role, content: m.content };
+          })
         });
         // @ts-ignore
         return response.content[0].text;
+      };
+
+      const tryGemini = async (model: string) => {
+        if (!genAI) throw new Error("Gemini API key not configured");
+        const response = await genAI.models.generateContent({
+          model: model || 'gemini-3-flash-preview',
+          contents: [
+            { role: 'user', parts: [{ text: systemPrompt }] },
+            ...messages.map((m: any) => {
+              const parts: any[] = [{ text: m.content || " " }];
+              if (m.files && m.files.length > 0) {
+                m.files.forEach((f: any) => {
+                  if (f.type.startsWith('image/')) {
+                    const base64Data = f.data.split(',')[1];
+                    parts.push({
+                      inlineData: {
+                        data: base64Data,
+                        mimeType: f.type
+                      }
+                    });
+                  }
+                });
+              }
+              return { 
+                role: m.role === 'assistant' ? 'model' : 'user', 
+                parts 
+              };
+            })
+          ]
+        });
+        return response.text;
       };
 
       if (modelId.startsWith('gpt')) {
         try {
           responseText = await tryOpenAI(modelId) || "";
         } catch (e) {
-          console.warn("OpenAI failed, falling back to Anthropic", e);
-          responseText = await tryAnthropic('claude-3-5-sonnet-20241022') || "";
+          console.warn("OpenAI failed, falling back to Gemini", e);
+          responseText = await tryGemini('gemini-3-flash-preview') || "";
         }
       } else if (modelId.startsWith('claude')) {
         try {
           responseText = await tryAnthropic(modelId) || "";
         } catch (e) {
-          console.warn("Anthropic failed, falling back to OpenAI", e);
+          console.warn("Anthropic failed, falling back to Gemini", e);
+          responseText = await tryGemini('gemini-3-flash-preview') || "";
+        }
+      } else if (modelId.startsWith('gemini')) {
+        try {
+          responseText = await tryGemini(modelId) || "";
+        } catch (e) {
+          console.warn("Gemini failed, falling back to OpenAI", e);
           responseText = await tryOpenAI('gpt-4o') || "";
         }
       } else {
-        // Fallback for Gemini if it was routed here
         try {
-          responseText = await tryOpenAI('gpt-4o') || "";
+          responseText = await tryGemini('gemini-3-flash-preview') || "";
         } catch (e) {
-          console.warn("OpenAI fallback failed, trying Anthropic", e);
-          responseText = await tryAnthropic('claude-3-5-sonnet-20241022') || "";
+          console.warn("Gemini fallback failed, trying OpenAI", e);
+          responseText = await tryOpenAI('gpt-4o') || "";
         }
       }
 
       return res.json({ text: responseText });
     } catch (error: any) {
       console.error("AI Proxy Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/generate-image", async (req, res) => {
+    const { prompt, config } = req.body;
+    if (!openai) return res.status(500).json({ error: "OpenAI API key not configured" });
+
+    try {
+      const response = await openai.images.generate({
+        model: "dall-e-3",
+        prompt: prompt,
+        n: 1,
+        size: "1024x1024",
+      });
+
+      res.json({ url: response.data[0].url });
+    } catch (error: any) {
+      console.error("Image Generation Error:", error);
       res.status(500).json({ error: error.message });
     }
   });

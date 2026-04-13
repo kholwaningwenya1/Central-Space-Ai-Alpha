@@ -33,7 +33,7 @@ export function AppGuideBot() {
       
       const systemInstruction = `You are the Central Space App Guide Bot. Your job is to help users understand how to use this application.
 The app features:
-- Chat & Research: AI chat with multiple models (Gemini, OpenAI, Anthropic), web search, and file uploads.
+- Chat & Research: AI chat with multiple models (OpenAI, Anthropic), web search, and file uploads.
 - Canvas: A visual workspace for diagrams and notes.
 - Document Editor: A rich text editor for reports and articles.
 - Library: A place to store and organize files and assets.
@@ -46,7 +46,7 @@ Be concise, helpful, and friendly. If the user asks you to perform a task, you c
       const response = await generateChatResponse(chatMessages, {
         tone: 'Friendly',
         voice: 'First person',
-        modelId: 'gemini-3-flash-preview',
+        modelId: 'gpt-4o',
         customSystemInstruction: systemInstruction,
         searchEnabled: false
       });

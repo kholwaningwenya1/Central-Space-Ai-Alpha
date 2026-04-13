@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Sparkles, FileText, Download, Save, Trash2, Wand2, Type, Bold, Italic, List, ListOrdered, Heading1, Heading2, Users, History, Layout, Upload, CheckCircle2, AlertCircle, X, ChevronRight, ChevronLeft, Search, Replace, Languages, FileType, MousePointer2 } from 'lucide-react';
+import { Sparkles, FileText, Download, Save, Trash2, Wand2, Type, Bold, Italic, List, ListOrdered, Heading1, Heading2, Users, History, Layout, Upload, CheckCircle2, AlertCircle, X, ChevronRight, ChevronLeft, Search, Replace, Languages, FileType, MousePointer2, Table2, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Presence, DocumentVersion, DocumentTemplate } from '../types';
 import { useSocket } from '../contexts/SocketContext';
 import { motion, AnimatePresence } from 'motion/react';
 import mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
+import { SpreadsheetEditor } from './SpreadsheetEditor';
+import { toast } from 'sonner';
 
 // Set worker for PDF.js
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -48,6 +51,7 @@ export function DocumentEditor({
   const [content, setContent] = useState(data || '');
   const [isAIProcessing, setIsAIProcessing] = useState(false);
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
+  const [editorMode, setEditorMode] = useState<'text' | 'markdown' | 'csv' | 'spreadsheet'>('markdown');
   const [showHistory, setShowHistory] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
@@ -58,6 +62,8 @@ export function DocumentEditor({
   const [replaceText, setReplaceText] = useState('');
   const [remoteCursors, setRemoteCursors] = useState<{ [uid: string]: RemoteCursor }>({});
   const [cursorPositions, setCursorPositions] = useState<{ [uid: string]: { x: number; y: number } }>({});
+  const [isRecordingMacro, setIsRecordingMacro] = useState(false);
+  const [macroActions, setMacroActions] = useState<any[]>([]);
   
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
@@ -171,6 +177,10 @@ export function DocumentEditor({
           setContent(newContent);
           onSave(newContent);
           emitDocUpdate(newContent);
+          
+          if (isRecordingMacro) {
+            setMacroActions(prev => [...prev, { type: 'aiAction', action }]);
+          }
         }
       }
     } catch (error) {
@@ -353,6 +363,10 @@ export function DocumentEditor({
     setContent(newContent);
     onSave(newContent);
     emitDocUpdate(newContent);
+    
+    if (isRecordingMacro) {
+      setMacroActions(prev => [...prev, { type: 'findReplace', find: findText, replace: replaceText }]);
+    }
   };
 
   const wordCount = useMemo(() => content.trim() ? content.trim().split(/\s+/).length : 0, [content]);
@@ -366,37 +380,85 @@ export function DocumentEditor({
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-zinc-200 shadow-sm">
             <button 
-              onClick={() => setViewMode('edit')}
+              onClick={() => setEditorMode('text')}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
-                viewMode === 'edit' ? "bg-zinc-900 text-white" : "text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100"
+                "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2",
+                editorMode === 'text' ? "bg-zinc-900 text-white" : "text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100"
               )}
             >
-              Editor
+              Text
             </button>
             <button 
-              onClick={() => setViewMode('preview')}
+              onClick={() => setEditorMode('markdown')}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
-                viewMode === 'preview' ? "bg-zinc-900 text-white" : "text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100"
+                "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2",
+                editorMode === 'markdown' ? "bg-zinc-900 text-white" : "text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100"
               )}
             >
-              Preview
+              MD
+            </button>
+            <button 
+              onClick={() => setEditorMode('csv')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2",
+                editorMode === 'csv' ? "bg-zinc-900 text-white" : "text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100"
+              )}
+            >
+              CSV
+            </button>
+            <button 
+              onClick={() => setEditorMode('spreadsheet')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2",
+                editorMode === 'spreadsheet' ? "bg-zinc-900 text-white" : "text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100"
+              )}
+            >
+              Sheet
             </button>
           </div>
           
-          <div className="w-px h-6 bg-zinc-200 mx-2" />
-          
-          <div className="flex items-center gap-1">
-            <button onClick={() => insertText('# ')} className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all" title="Heading 1"><Heading1 className="w-4 h-4" /></button>
-            <button onClick={() => insertText('## ')} className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all" title="Heading 2"><Heading2 className="w-4 h-4" /></button>
-            <button onClick={() => insertText('**', '**')} className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all" title="Bold"><Bold className="w-4 h-4" /></button>
-            <button onClick={() => insertText('_', '_')} className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all" title="Italic"><Italic className="w-4 h-4" /></button>
-            <button onClick={() => insertText('- ')} className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all" title="Bullet List"><List className="w-4 h-4" /></button>
-            <button onClick={() => setShowFindReplace(!showFindReplace)} className={cn("p-2 rounded-lg transition-all", showFindReplace ? "bg-zinc-200 text-zinc-900" : "text-zinc-500 hover:text-zinc-900 hover:bg-white")} title="Find and Replace"><Search className="w-4 h-4" /></button>
-            <button onClick={exportToMarkdown} className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all" title="Export as Markdown"><Download className="w-4 h-4" /></button>
-            <button onClick={exportToPDF} className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all" title="Export as PDF"><FileType className="w-4 h-4" /></button>
-          </div>
+          {(editorMode === 'markdown' || editorMode === 'text' || editorMode === 'csv') && (
+            <>
+              <div className="w-px h-6 bg-zinc-200 mx-2" />
+              <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-zinc-200 shadow-sm">
+                <button 
+                  onClick={() => setViewMode('edit')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+                    viewMode === 'edit' ? "bg-zinc-900 text-white" : "text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100"
+                  )}
+                >
+                  Editor
+                </button>
+                <button 
+                  onClick={() => setViewMode('preview')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+                    viewMode === 'preview' ? "bg-zinc-900 text-white" : "text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100"
+                  )}
+                >
+                  Preview
+                </button>
+              </div>
+              
+              <div className="w-px h-6 bg-zinc-200 mx-2" />
+              
+              <div className="flex items-center gap-1">
+                {editorMode === 'markdown' && (
+                  <>
+                    <button onClick={() => insertText('# ')} className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all" title="Heading 1"><Heading1 className="w-4 h-4" /></button>
+                    <button onClick={() => insertText('## ')} className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all" title="Heading 2"><Heading2 className="w-4 h-4" /></button>
+                    <button onClick={() => insertText('**', '**')} className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all" title="Bold"><Bold className="w-4 h-4" /></button>
+                    <button onClick={() => insertText('_', '_')} className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all" title="Italic"><Italic className="w-4 h-4" /></button>
+                    <button onClick={() => insertText('- ')} className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all" title="Bullet List"><List className="w-4 h-4" /></button>
+                  </>
+                )}
+                <button onClick={() => setShowFindReplace(!showFindReplace)} className={cn("p-2 rounded-lg transition-all", showFindReplace ? "bg-zinc-200 text-zinc-900" : "text-zinc-500 hover:text-zinc-900 hover:bg-white")} title="Find and Replace"><Search className="w-4 h-4" /></button>
+                <button onClick={exportToMarkdown} className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all" title="Export as File"><Download className="w-4 h-4" /></button>
+                <button onClick={exportToPDF} className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-lg transition-all" title="Export as PDF"><FileType className="w-4 h-4" /></button>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -423,6 +485,49 @@ export function DocumentEditor({
           )}
           
           <div className="flex items-center gap-1 mr-2">
+            <button 
+              onClick={() => {
+                if (isRecordingMacro) {
+                  setIsRecordingMacro(false);
+                  toast.success(`Macro saved with ${macroActions.length} actions.`);
+                } else {
+                  setIsRecordingMacro(true);
+                  setMacroActions([]);
+                  toast.info('Started recording macro...');
+                }
+              }}
+              className={cn("p-2 rounded-xl transition-all flex items-center gap-2", isRecordingMacro ? "bg-red-500 text-white animate-pulse" : "text-zinc-400 hover:text-zinc-900 hover:bg-white")}
+              title={isRecordingMacro ? "Stop Recording" : "Record Macro"}
+            >
+              <div className={cn("w-2 h-2 rounded-full", isRecordingMacro ? "bg-white" : "bg-red-500")} />
+              {isRecordingMacro && <span className="text-xs font-bold">REC</span>}
+            </button>
+            {!isRecordingMacro && macroActions.length > 0 && (
+              <button 
+                onClick={async () => {
+                  toast.info('Applying macro...');
+                  let currentContent = content;
+                  for (const action of macroActions) {
+                    if (action.type === 'findReplace') {
+                      currentContent = currentContent.split(action.find).join(action.replace);
+                    } else if (action.type === 'aiAction') {
+                      const result = await onAIAction(action.action, currentContent);
+                      if (result) {
+                        currentContent = currentContent + '\n\n' + result;
+                      }
+                    }
+                  }
+                  setContent(currentContent);
+                  onSave(currentContent);
+                  emitDocUpdate(currentContent);
+                  toast.success('Macro applied successfully.');
+                }}
+                className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-all"
+                title="Apply Macro to Current Document"
+              >
+                Apply Macro
+              </button>
+            )}
             <button 
               onClick={() => setShowHistory(!showHistory)}
               className={cn("p-2 rounded-xl transition-all", showHistory ? "bg-zinc-900 text-white" : "text-zinc-400 hover:text-zinc-900 hover:bg-white")}
@@ -462,8 +567,10 @@ export function DocumentEditor({
       </div>
 
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Main Editor Area */}
-        <div className="flex-1 overflow-y-auto p-8 bg-zinc-50/30 relative">
+        {editorMode === 'spreadsheet' ? (
+          <SpreadsheetEditor data={content} onSave={(newData) => { setContent(newData); onSave(newData); emitDocUpdate(newData); }} onAIAction={onAIAction} />
+        ) : (
+          <div className="flex-1 overflow-y-auto p-8 bg-zinc-50/30 relative">
           {showFindReplace && (
             <div className="max-w-4xl mx-auto mb-4 p-4 bg-white rounded-2xl border border-zinc-200 shadow-sm flex items-center gap-4 animate-in fade-in slide-in-from-top-2">
               <div className="flex-1 flex items-center gap-2 bg-zinc-50 px-3 py-2 rounded-xl border border-zinc-100">
@@ -500,23 +607,25 @@ export function DocumentEditor({
             {viewMode === 'edit' ? (
               <div className="flex-1 flex flex-col relative">
                 {/* Mirror Div for Highlighting Grammar Errors */}
-                <div 
-                  ref={mirrorRef}
-                  className="absolute inset-0 p-12 text-lg leading-relaxed font-serif text-transparent whitespace-pre-wrap break-words pointer-events-none"
-                  aria-hidden="true"
-                >
-                  {content.split(/(\s+)/).map((part, i) => {
-                    const hasSuggestion = grammarSuggestions.some(s => s.original.toLowerCase() === part.toLowerCase().replace(/[.,!?;:]/g, ''));
-                    return (
-                      <span 
-                        key={i} 
-                        className={cn(hasSuggestion && "bg-red-200/50 border-b-2 border-red-500")}
-                      >
-                        {part}
-                      </span>
-                    );
-                  })}
-                </div>
+                {editorMode === 'markdown' && (
+                  <div 
+                    ref={mirrorRef}
+                    className="absolute inset-0 p-12 text-lg leading-relaxed font-serif text-transparent whitespace-pre-wrap break-words pointer-events-none"
+                    aria-hidden="true"
+                  >
+                    {content.split(/(\s+)/).map((part, i) => {
+                      const hasSuggestion = grammarSuggestions.some(s => s.original.toLowerCase() === part.toLowerCase().replace(/[.,!?;:]/g, ''));
+                      return (
+                        <span 
+                          key={i} 
+                          className={cn(hasSuggestion && "bg-red-200/50 border-b-2 border-red-500")}
+                        >
+                          {part}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
 
                 <textarea
                   ref={editorRef}
@@ -535,7 +644,10 @@ export function DocumentEditor({
                     }
                   }}
                   placeholder="Start writing your masterpiece..."
-                  className="flex-1 w-full p-12 text-lg leading-relaxed focus:outline-none resize-none font-serif text-zinc-800 bg-transparent placeholder:text-zinc-200 z-10"
+                  className={cn(
+                    "flex-1 w-full p-12 text-lg leading-relaxed focus:outline-none resize-none text-zinc-800 bg-transparent placeholder:text-zinc-200 z-10",
+                    (editorMode === 'markdown' || editorMode === 'text') ? "font-serif" : "font-mono text-sm"
+                  )}
                 />
                 
                 {/* Remote Cursors */}
@@ -616,12 +728,31 @@ export function DocumentEditor({
                 )}
               </div>
             ) : (
-              <div className="flex-1 p-12 prose prose-zinc max-w-none font-serif">
-                <Markdown>{content || '*No content yet. Start writing in the editor!*'}</Markdown>
+              <div className="flex-1 p-12 markdown-body max-w-none">
+                {editorMode === 'markdown' ? (
+                  <Markdown remarkPlugins={[remarkGfm]}>{content || '*No content yet. Start writing in the editor!*'}</Markdown>
+                ) : editorMode === 'csv' ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border-collapse border border-zinc-200 text-sm">
+                      <tbody>
+                        {content.split('\n').map((line, i) => (
+                          <tr key={i}>
+                            {line.split(',').map((cell, j) => (
+                              <td key={j} className="border border-zinc-200 px-4 py-2">{cell}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <pre className="whitespace-pre-wrap font-mono text-sm">{content || 'No content yet.'}</pre>
+                )}
               </div>
             )}
           </div>
         </div>
+        )}
 
         {/* Side Panels */}
         <AnimatePresence>
@@ -667,12 +798,31 @@ export function DocumentEditor({
                 <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-900">Templates</h3>
                 <button onClick={() => setShowTemplates(false)}><X className="w-4 h-4 text-zinc-400" /></button>
               </div>
-              <div className="p-4 border-b border-zinc-100">
+              <div className="p-4 border-b border-zinc-100 space-y-2">
                 <button 
                   onClick={saveAsTemplate}
                   className="w-full py-2 bg-zinc-900 text-white rounded-xl text-xs font-bold hover:bg-zinc-800 transition-all"
                 >
                   Save Current as Template
+                </button>
+                <button 
+                  onClick={async () => {
+                    const prompt = window.prompt("What kind of document would you like to generate?");
+                    if (prompt) {
+                      toast.info("Generating document...");
+                      const result = await onAIAction(`Generate a comprehensive document based on this prompt: ${prompt}`, "");
+                      if (result) {
+                        setContent(result);
+                        onSave(result);
+                        emitDocUpdate(result);
+                        toast.success("Document generated!");
+                      }
+                    }
+                  }}
+                  className="w-full py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Generate from Scratch (AI)
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -775,21 +925,3 @@ export function DocumentEditor({
   );
 }
 
-function Loader2({ className }: { className?: string }) {
-  return (
-    <svg 
-      className={cn("animate-spin", className)} 
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" 
-      height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round"
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
-  );
-}

@@ -1,15 +1,12 @@
 export type Tone = 'Formal academic' | 'Professional' | 'Friendly' | 'Playful';
 export type Voice = 'First person' | 'Second person' | 'Third person';
 export type AIModel = 
-  | 'gemini-3-flash-preview' 
-  | 'gemini-3.1-pro-preview' 
-  | 'gemini-2.5-flash'
   | 'gpt-4o'
   | 'gpt-4o-mini'
   | 'claude-3-5-sonnet'
   | 'claude-3-opus';
 
-export type SessionMode = 'chat' | 'canvas' | 'library' | 'settings' | 'units' | 'document' | 'directory' | 'bots' | 'media' | 'billing' | 'admin';
+export type SessionMode = 'chat' | 'canvas' | 'library' | 'settings' | 'units' | 'document' | 'directory' | 'bots' | 'media' | 'billing' | 'admin' | 'blueprint';
 export type ConversationType = 'direct' | 'group' | 'channel' | 'workspace';
 
 export type UserRole = 'super_admin' | 'admin' | 'support' | 'user';
@@ -67,6 +64,9 @@ export interface Bot {
   description: string;
   avatar?: string;
   systemInstruction: string;
+  prompt?: string; // New prompt field for instructions/data
+  websiteUrl?: string; // New website link field
+  files?: FileData[]; // New files field for docs, images, contacts, audios
   commands: { command: string; description: string; action?: string }[];
   webhookUrl?: string;
   creatorId: string;
@@ -185,6 +185,9 @@ export interface UserSettings {
   tone: Tone;
   voice: Voice;
   sidebarCollapsed: boolean;
+  omniBotEnabled?: boolean;
+  autoReadOutLoud?: boolean;
+  autoGenerateAudio?: boolean;
 }
 
 export interface AppNotification {

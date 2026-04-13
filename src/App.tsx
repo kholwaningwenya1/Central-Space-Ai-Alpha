@@ -15,14 +15,15 @@ import { MediaHub } from './components/MediaHub';
 import { Settings } from './components/Settings';
 import { Billing } from './components/Billing';
 import { AdminPanel } from './components/AdminPanel';
-import { Message, Tone, Voice, WorkspaceSession, FileData, SessionMode, Bot, Presence, ConversationType, Reaction, Poll, DocumentVersion, DocumentTemplate, UserProfile, SubscriptionPlan, UserRole, ResultType } from './types';
+import { OmniBot } from './components/OmniBot';
+import { BlueprintGenerator } from './components/BlueprintGenerator';
+import { Message, Tone, Voice, WorkspaceSession, FileData, SessionMode, Bot, Presence, ConversationType, Reaction, Poll, DocumentVersion, DocumentTemplate, UserProfile, SubscriptionPlan, UserRole, ResultType, UserSettings } from './types';
 import { AppGuideBot } from './components/AppGuideBot';
-import { GoogleGenAI } from "@google/genai";
+import { AdBanner } from './components/AdBanner';
 import { generateChatResponse, generateChatResponseStream, generateImageFromPrompt, generateVideoFromPrompt, transcribeAudio, translateText, findYouTubeLinks, generateSpeech } from './services/aiService';
-import { LiveMode } from './components/LiveMode';
 import { MobileLogin } from './components/MobileLogin';
 import { useSocket } from './contexts/SocketContext';
-import { Send, Loader2, PlusCircle, Trash2, Paperclip, X, Download, Mic, LogIn, LogOut, AlertCircle, MicOff, Search, FileText, FileSpreadsheet, Shield, Sparkles, Bot as BotIcon, Users, Smile, Image as ImageIcon, Folder } from 'lucide-react';
+import { Send, Loader2, PlusCircle, Trash2, Paperclip, X, Download, Mic, LogIn, LogOut, AlertCircle, MicOff, Search, FileText, FileSpreadsheet, Shield, Sparkles, Bot as BotIcon, Users, Smile, Image as ImageIcon, Folder, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import EmojiPicker from 'emoji-picker-react';
 import { 
@@ -163,10 +164,28 @@ export default function App() {
     const shuffled = [...TRENDING_QUERIES].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, 4);
   }, [currentSessionId]);
-  const [hasApiKey, setHasApiKey] = useState(true);
   const [roomUsers, setRoomUsers] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
-  const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
+  const [templates, setTemplates] = useState<DocumentTemplate[]>([
+    {
+      id: 'default-report',
+      title: 'Annual Report Template',
+      description: 'A comprehensive template for annual business reports.',
+      content: '# Annual Report\n\n## Executive Summary\n\n## Financial Highlights\n\n## Operational Review\n\n## Future Outlook',
+      category: 'report',
+      creatorId: 'system',
+      createdAt: Date.now()
+    },
+    {
+      id: 'default-proposal',
+      title: 'Business Proposal',
+      description: 'Standard business proposal format for clients.',
+      content: '# Business Proposal\n\n## Introduction\n\n## Problem Statement\n\n## Proposed Solution\n\n## Pricing & Timeline\n\n## Terms & Conditions',
+      category: 'other',
+      creatorId: 'system',
+      createdAt: Date.now()
+    }
+  ]);
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
   const { socket, isConnected } = useSocket();
@@ -175,33 +194,16 @@ export default function App() {
   
   // Voice Recording State
   const [isRecording, setIsRecording] = useState(false);
+  const [userSettings, setUserSettings] = useState<UserSettings>({
+    tone: 'Professional',
+    voice: 'Second person',
+    sidebarCollapsed: false,
+    omniBotEnabled: true,
+    autoReadOutLoud: false,
+    autoGenerateAudio: false
+  });
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-
-  // Check for API key on mount
-  useEffect(() => {
-    const checkApiKey = async () => {
-      const hasSeenPopup = sessionStorage.getItem('hasSeenApiKeyPopup');
-      
-      if (window.aistudio?.hasSelectedApiKey) {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        setHasApiKey(hasKey);
-      } else if (!process.env.GEMINI_API_KEY && !process.env.API_KEY) {
-        if (!hasSeenPopup) {
-          setHasApiKey(false);
-          sessionStorage.setItem('hasSeenApiKeyPopup', 'true');
-          
-          // Auto-dismiss after 6 seconds
-          setTimeout(() => {
-            setHasApiKey(true);
-          }, 6000);
-        } else {
-          setHasApiKey(true); // Don't show again
-        }
-      }
-    };
-    checkApiKey();
-  }, []);
 
   // Fetch all users for direct messaging
   useEffect(() => {
@@ -248,14 +250,6 @@ export default function App() {
       };
     }
   }, [socket, isConnected, currentSessionId, user]);
-
-  const handleOpenSelectKey = async () => {
-    if (window.aistudio?.openSelectKey) {
-      await window.aistudio.openSelectKey();
-      // Assume success and proceed as per guidelines
-      setHasApiKey(true);
-    }
-  };
 
   // Get user location for maps grounding
   useEffect(() => {
@@ -316,42 +310,28 @@ export default function App() {
   const generateSmartSuggestions = async (lastAssistantMessage: string) => {
     if (!lastAssistantMessage) return [];
     try {
-      const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
-      if (!apiKey) throw new Error('API key is missing');
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Based on the following AI response, suggest 3 short, relevant follow-up questions or actions the user might want to take. Return ONLY a JSON array of strings.
-        
-        AI Response: "${lastAssistantMessage}"`,
-        config: {
-          responseMimeType: "application/json"
-        }
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: `Based on the following AI response, suggest 3 short, relevant follow-up questions or actions the user might want to take. Return ONLY a JSON array of strings.\n\nAI Response: "${lastAssistantMessage}"` }],
+          settings: { modelId: 'gpt-4o-mini', customSystemInstruction: "You are a helpful assistant that returns ONLY a JSON array of strings." },
+          modelId: 'gpt-4o-mini',
+          searchEnabled: false
+        })
       });
-      
-      const suggestions = JSON.parse(response.text || "[]");
-      return suggestions.slice(0, 3);
-    } catch (error) {
-      console.warn("Gemini suggestions failed, attempting fallback...", error);
-      try {
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: [{ role: 'user', content: `Based on the following AI response, suggest 3 short, relevant follow-up questions or actions the user might want to take. Return ONLY a JSON array of strings.\n\nAI Response: "${lastAssistantMessage}"` }],
-            settings: { modelId: 'gpt-4o-mini', customSystemInstruction: "You are a helpful assistant that returns ONLY a JSON array of strings." },
-            modelId: 'gpt-4o-mini',
-            searchEnabled: false
-          })
-        });
-        if (!response.ok) throw new Error('Fallback suggestions failed');
-        const data = await response.json();
-        const suggestions = JSON.parse(data.text || "[]");
-        return suggestions.slice(0, 3);
-      } catch (fallbackError) {
-        console.error("Error generating suggestions:", fallbackError);
-        return [];
+      if (!response.ok) throw new Error('Suggestions failed');
+      const data = await response.json();
+      let text = data.text || "[]";
+      // Remove markdown code blocks if present
+      if (text.includes('```')) {
+        text = text.replace(/```(?:json)?\n?([\s\S]*?)\n?```/g, '$1').trim();
       }
+      const suggestions = JSON.parse(text);
+      return Array.isArray(suggestions) ? suggestions.slice(0, 3) : [];
+    } catch (error) {
+      console.error("Error generating suggestions:", error);
+      return [];
     }
   };
 
@@ -474,7 +454,7 @@ export default function App() {
       }], {
         tone: currentSession.tone || 'Professional',
         voice: currentSession.voice || 'Second person',
-        modelId: currentSession.modelId || 'gemini-3-flash-preview',
+        modelId: currentSession.modelId || 'gpt-4o',
         libraryContext: "", // Already included in content
         isSuperAdminModeActive: userProfile?.isSuperAdminModeActive
       });
@@ -492,15 +472,6 @@ export default function App() {
       return;
     }
     
-    // Check for API key before generating video
-    if (window.aistudio?.hasSelectedApiKey) {
-      const hasKey = await window.aistudio.hasSelectedApiKey();
-      if (!hasKey) {
-        setHasApiKey(false);
-        return;
-      }
-    }
-
     setIsGeneratingVideo(true);
     try {
       const videoUrl = await generateVideoFromPrompt(prompt);
@@ -879,7 +850,7 @@ export default function App() {
       tone: 'Professional',
       voice: 'Second person',
       resultType: 'Text',
-      modelId: 'gemini-3-flash-preview',
+      modelId: 'gpt-4o',
       mode: 'chat',
       files: [],
       agentUnits: [],
@@ -966,9 +937,29 @@ export default function App() {
     }
     try {
       const translatedContent = await translateText(text, lang);
+      
+      let audioUrl = undefined;
+      if (userSettings.autoGenerateAudio) {
+        try {
+          audioUrl = await generateSpeech(translatedContent, currentSession.ttsVoice || 'Kore');
+        } catch (e) {
+          console.error("Auto speech generation for translation failed", e);
+        }
+      }
+
       const updatedMessages = currentSession.messages.map(m => 
-        m.id === messageId ? { ...m, translation: { language: lang, content: translatedContent } } : m
+        m.id === messageId ? { 
+          ...m, 
+          translation: { language: lang, content: translatedContent },
+          ...(audioUrl ? { audioUrl } : {})
+        } : m
       );
+
+      if (userSettings.autoReadOutLoud) {
+        const utterance = new SpeechSynthesisUtterance(translatedContent);
+        window.speechSynthesis.speak(utterance);
+      }
+
       await updateDoc(doc(db, 'sessions', currentSessionId), {
         messages: updatedMessages,
         updatedAt: Date.now()
@@ -1223,7 +1214,7 @@ export default function App() {
       const { responseStream } = await generateChatResponseStream(chatHistory, {
         tone: currentSession?.tone || 'Professional',
         voice: currentSession?.voice || 'First person',
-        modelId: bot.modelId || 'gemini-3-flash-preview',
+        modelId: bot.modelId || 'gpt-4o',
         libraryContext: '',
         agentUnits: [],
         customSystemInstruction: bot.systemInstruction,
@@ -1444,7 +1435,7 @@ export default function App() {
       const { responseStream, agentDiscussion } = await generateChatResponseStream(chatHistory, { 
         tone: currentSession?.tone || 'Professional', 
         voice: currentSession?.voice || 'Second person',
-        modelId: currentSession?.modelId || 'gemini-3-flash-preview',
+        modelId: currentSession?.modelId || 'gpt-4o',
         searchEnabled: currentSession?.searchEnabled,
         libraryContext,
         agentUnits: currentSession?.agentUnits,
@@ -1618,7 +1609,7 @@ export default function App() {
 
     } catch (error: any) {
       console.error('Error generating response:', error);
-      let errorText = "Failed to call the Gemini API. Please try again.";
+      let errorText = "Failed to call the AI API. Please try again.";
       
       if (error.message?.includes('max tokens')) {
         errorText = "The conversation or files are too large for the current model. Try starting a new session or removing some files.";
@@ -1895,15 +1886,17 @@ export default function App() {
     <ErrorBoundary>
       <div className="flex h-screen bg-zinc-50 overflow-hidden relative">
         {/* Mobile Sidebar Overlay */}
-        {isMobileView && !isSidebarCollapsed && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setIsSidebarCollapsed(true)}
-            className="absolute inset-0 bg-black/50 z-40 backdrop-blur-sm"
-          />
-        )}
+        <AnimatePresence>
+          {isMobileView && !isSidebarCollapsed && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSidebarCollapsed(true)}
+              className="absolute inset-0 bg-black/50 z-40 backdrop-blur-sm"
+            />
+          )}
+        </AnimatePresence>
 
         {/* Global Search Overlay */}
         <AnimatePresence>
@@ -2054,7 +2047,7 @@ export default function App() {
           currentVoice={currentSession?.voice || 'Second person'} 
           currentResultType={currentSession?.resultType || 'Text'}
           currentTtsVoice={currentSession?.ttsVoice || 'Kore'}
-          currentModel={currentSession?.modelId || 'gemini-3-flash-preview'}
+          currentModel={currentSession?.modelId || 'gpt-4o'}
           currentMode={currentSession?.mode || 'chat'}
           privacyMode={currentSession?.privacyMode || false}
           onToneChange={(tone) => currentSessionId && updateSession(currentSessionId, { tone })} 
@@ -2090,7 +2083,7 @@ export default function App() {
                   onClick={() => setIsSidebarCollapsed(false)}
                   className="p-2 -ml-2 text-zinc-400 hover:text-zinc-900 transition-colors"
                 >
-                  <Search className="w-5 h-5 rotate-90" />
+                  <Menu className="w-5 h-5" />
                 </button>
               )}
               <h2 className="text-sm font-semibold text-zinc-900 truncate max-w-[120px] md:max-w-[200px]">
@@ -2432,11 +2425,35 @@ export default function App() {
                   </div>
                 </div>
               )
+            ) : currentSession?.mode === 'blueprint' ? (
+              userProfile?.role === 'super_admin' || ['advanced', 'corporate'].includes(userProfile?.plan || 'free') ? (
+                <BlueprintGenerator 
+                  onAIAction={handleDocumentAIAction} 
+                  onSaveToLibrary={(file) => {
+                    if (!currentSessionId || !currentSession) return;
+                    const newFiles = [...(currentSession.files || []), { ...file, id: Math.random().toString(36).substr(2, 9), timestamp: Date.now() }];
+                    updateSession(currentSessionId, { files: newFiles });
+                  }}
+                />
+              ) : (
+                <div className="flex-1 flex items-center justify-center p-12 text-center">
+                  <div className="max-w-md">
+                    <h3 className="text-2xl font-bold mb-4">Upgrade Required</h3>
+                    <p className="text-zinc-500 mb-6">The Blueprint Generator requires the Advanced plan or higher.</p>
+                    <button onClick={() => updateSession(currentSessionId!, { mode: 'billing' })} className="px-6 py-3 bg-zinc-950 text-white rounded-xl font-medium hover:bg-zinc-800">View Plans</button>
+                  </div>
+                </div>
+              )
             ) : currentSession?.mode === 'library' ? (
               <Library 
                 files={currentSession.files || []} 
                 onDelete={handleLibraryDelete}
                 onUpload={handleLibraryUpload}
+                onChatWithLibrary={() => {
+                  if (!currentSessionId) return;
+                  updateSession(currentSessionId, { mode: 'chat' });
+                  setInput("I want to query the data in my Work Library. What can you tell me about the files stored here?");
+                }}
               />
             ) : currentSession?.mode === 'units' ? (
               <Units 
@@ -2465,6 +2482,8 @@ export default function App() {
                 onDeleteSession={clearWorkspace}
                 onClearChat={clearChat}
                 onExportSession={exportWorkspace}
+                userSettings={userSettings}
+                onUpdateUserSettings={(updates) => setUserSettings(prev => ({ ...prev, ...updates }))}
               />
             ) : currentSession?.mode === 'billing' ? (
               <div className="flex-1 overflow-y-auto p-6 md:p-12 bg-zinc-50">
@@ -2562,55 +2581,113 @@ export default function App() {
                 ))}
               </AnimatePresence>
               {isLoading && (
-                <div className="p-10 flex gap-8 bg-white/50 backdrop-blur-sm animate-in">
-                  <div className="w-12 h-12 rounded-2xl bg-zinc-950 flex items-center justify-center shrink-0 shadow-2xl shadow-zinc-950/20 rotate-3 animate-bounce overflow-hidden">
-                    <img src="/logo.png" alt="Central Space Logo" className="w-full h-full object-cover" />
+                <div className="p-8 flex gap-6 bg-white/50 backdrop-blur-md animate-in rounded-3xl border border-zinc-100 shadow-sm mx-4 my-2">
+                  <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-zinc-900 to-zinc-800 flex items-center justify-center shrink-0 shadow-xl overflow-hidden">
+                    <motion.div 
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                      className="absolute inset-0 bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(255,255,255,0.3)_360deg)]"
+                    />
+                    <img src="/logo.png" alt="Central Space Logo" className="w-8 h-8 object-contain relative z-10 drop-shadow-md" />
                   </div>
-                  <div className="flex-1 space-y-6 py-2">
-                    <div className="flex items-center gap-3">
-                      <div className="h-5 bg-zinc-200 rounded-full w-32 animate-pulse" />
-                      <div className="h-2 w-2 rounded-full bg-zinc-300" />
-                      <div className="h-4 bg-zinc-100 rounded-full w-48 animate-pulse" />
+                  <div className="flex-1 py-1">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xs font-black text-zinc-900 uppercase tracking-widest">Processing</span>
+                      <motion.div className="flex gap-1">
+                        {[0, 1, 2].map((i) => (
+                          <motion.div
+                            key={i}
+                            animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1, 0.8] }}
+                            transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.2 }}
+                            className="w-1.5 h-1.5 rounded-full bg-zinc-400"
+                          />
+                        ))}
+                      </motion.div>
                     </div>
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-3 gap-6">
-                        <div className="h-4 bg-zinc-100 rounded-full col-span-2 animate-pulse" />
-                        <div className="h-4 bg-zinc-100 rounded-full col-span-1 animate-pulse" />
-                      </div>
-                      <div className="h-4 bg-zinc-100 rounded-full w-11/12 animate-pulse" />
-                      <div className="h-4 bg-zinc-100 rounded-full w-10/12 animate-pulse" />
-                      <div className="grid grid-cols-4 gap-6">
-                        <div className="h-4 bg-zinc-100 rounded-full col-span-1 animate-pulse" />
-                        <div className="h-4 bg-zinc-100 rounded-full col-span-2 animate-pulse" />
-                      </div>
-                    </div>
-                    <div className="flex gap-3 pt-4">
-                      <div className="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 animate-pulse" />
-                      <div className="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 animate-pulse" />
-                      <div className="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 animate-pulse" />
+                    <div className="space-y-2.5">
+                      <motion.div 
+                        initial={{ width: "0%" }}
+                        animate={{ width: "100%" }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                        className="h-1.5 bg-gradient-to-r from-zinc-200 via-zinc-400 to-zinc-200 rounded-full"
+                      />
+                      <motion.div 
+                        initial={{ width: "0%" }}
+                        animate={{ width: "75%" }}
+                        transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
+                        className="h-1.5 bg-gradient-to-r from-zinc-200 via-zinc-300 to-zinc-200 rounded-full"
+                      />
                     </div>
                   </div>
                 </div>
               )}
               {isGeneratingImage && (
-                <div className="p-6 flex gap-4 bg-white">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center shrink-0">
-                    <Loader2 className="w-5 h-5 text-white animate-spin" />
+                <div className="p-8 flex gap-6 bg-white/50 backdrop-blur-md animate-in rounded-3xl border border-zinc-100 shadow-sm mx-4 my-2">
+                  <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center shrink-0 shadow-xl overflow-hidden">
+                    <motion.div 
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                      className="absolute inset-0 bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(255,255,255,0.3)_360deg)]"
+                    />
+                    <Loader2 className="w-6 h-6 text-white relative z-10 animate-spin" />
                   </div>
                   <div className="flex-1 py-1">
-                    <div className="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-2">Generating Image...</div>
-                    <div className="h-32 bg-zinc-50 border-2 border-dashed border-zinc-200 rounded-2xl animate-pulse" />
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xs font-black text-emerald-700 uppercase tracking-widest">Generating Image</span>
+                      <motion.div className="flex gap-1">
+                        {[0, 1, 2].map((i) => (
+                          <motion.div
+                            key={i}
+                            animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1, 0.8] }}
+                            transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.2 }}
+                            className="w-1.5 h-1.5 rounded-full bg-emerald-400"
+                          />
+                        ))}
+                      </motion.div>
+                    </div>
+                    <div className="relative h-32 bg-zinc-50 border-2 border-dashed border-emerald-200/50 rounded-2xl overflow-hidden">
+                      <motion.div 
+                        initial={{ y: "-100%" }}
+                        animate={{ y: "100%" }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                        className="absolute inset-0 bg-gradient-to-b from-transparent via-emerald-500/10 to-transparent"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
               {isGeneratingVideo && (
-                <div className="p-6 flex gap-4 bg-white">
-                  <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
-                    <Loader2 className="w-5 h-5 text-white animate-spin" />
+                <div className="p-8 flex gap-6 bg-white/50 backdrop-blur-md animate-in rounded-3xl border border-zinc-100 shadow-sm mx-4 my-2">
+                  <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shrink-0 shadow-xl overflow-hidden">
+                    <motion.div 
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                      className="absolute inset-0 bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(255,255,255,0.3)_360deg)]"
+                    />
+                    <Loader2 className="w-6 h-6 text-white relative z-10 animate-spin" />
                   </div>
                   <div className="flex-1 py-1">
-                    <div className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-2">Generating Video...</div>
-                    <div className="h-32 bg-zinc-50 border-2 border-dashed border-zinc-200 rounded-2xl animate-pulse" />
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xs font-black text-blue-700 uppercase tracking-widest">Generating Video</span>
+                      <motion.div className="flex gap-1">
+                        {[0, 1, 2].map((i) => (
+                          <motion.div
+                            key={i}
+                            animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1, 0.8] }}
+                            transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.2 }}
+                            className="w-1.5 h-1.5 rounded-full bg-blue-400"
+                          />
+                        ))}
+                      </motion.div>
+                    </div>
+                    <div className="relative h-32 bg-zinc-50 border-2 border-dashed border-blue-200/50 rounded-2xl overflow-hidden">
+                      <motion.div 
+                        initial={{ x: "-100%" }}
+                        animate={{ x: "100%" }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                        className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-500/10 to-transparent"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -2892,18 +2969,10 @@ export default function App() {
           </>
         )}
       </div>
-      <p className="text-[10px] text-center text-zinc-400 mt-3 uppercase tracking-widest font-bold">
-            Central Space AI v5.0 Enterprise Edition • Powered by Gemini 3.1 Pro, GPT-4o & Claude 3.5
-          </p>
+      <div className="px-6 pb-3">
+        <AdBanner />
+      </div>
         </div>
-        <AnimatePresence>
-          {isLiveModeOpen && (
-            <LiveMode 
-              onClose={() => setIsLiveModeOpen(false)}
-              systemInstruction={`You are Central Space AI, an all‑in‑one workspace assistant. You are currently in LIVE VOICE mode. Be concise, helpful, and natural in your speech. Focus on the user's current request.`}
-            />
-          )}
-        </AnimatePresence>
       </main>
     </div>
       <AnimatePresence>
@@ -2949,61 +3018,14 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+      
+      {userSettings.omniBotEnabled && (
+        <OmniBot onClose={() => setUserSettings(prev => ({ ...prev, omniBotEnabled: false }))} />
+      )}
+      
       <Toaster position="top-right" />
       
       {/* API Key Selection Overlay */}
-      <AnimatePresence>
-        {!hasApiKey && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-6">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-zinc-950/60 backdrop-blur-md"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl relative overflow-hidden p-8 text-center"
-            >
-              <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Shield className="w-8 h-8 text-amber-500" />
-              </div>
-              <h3 className="text-2xl font-bold text-zinc-950 tracking-tight mb-3">API Key Required</h3>
-              <p className="text-zinc-500 text-sm font-medium mb-8 leading-relaxed">
-                {window.aistudio?.openSelectKey ? (
-                  <>
-                    To generate high-quality videos with Veo, you need to select a paid Google Cloud project API key. 
-                    <br /><br />
-                    <a 
-                      href="https://ai.google.dev/gemini-api/docs/billing" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-zinc-950 underline font-bold"
-                    >
-                      Learn more about billing
-                    </a>
-                  </>
-                ) : (
-                  <>
-                    The Gemini API key is missing. Please configure the <code>GEMINI_API_KEY</code> in your environment variables to use AI features.
-                  </>
-                )}
-              </p>
-              {window.aistudio?.openSelectKey && (
-                <button
-                  onClick={handleOpenSelectKey}
-                  className="w-full py-4 bg-zinc-950 text-white rounded-2xl font-bold text-sm hover:bg-zinc-800 transition-all active:scale-95 shadow-xl shadow-zinc-950/10 flex items-center justify-center gap-2"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  Select API Key
-                </button>
-              )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
       {/* App Guide Chatbot */}
       <AppGuideBot />
     </ErrorBoundary>

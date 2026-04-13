@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Stage, Layer, Line, Rect, Circle, Transformer, Text, Image as KonvaImage } from 'react-konva';
-import { Square, Circle as CircleIcon, Type, MousePointer2, Pencil, Eraser, Trash2, Download, Undo2, Redo2, Minus, Plus, FileType } from 'lucide-react';
+import { Square, Circle as CircleIcon, Type, MousePointer2, Pencil, Eraser, Trash2, Download, Undo2, Redo2, Minus, Plus, FileType, Image as ImageIcon, StickyNote, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useSocket } from '../contexts/SocketContext';
 
@@ -8,6 +8,7 @@ interface CanvasProps {
   data: any;
   onSave: (data: any) => void;
   sessionId: string;
+  onAIAction?: (action: string, context: string) => Promise<string>;
 }
 
 const COLORS = [
@@ -20,7 +21,53 @@ const COLORS = [
   '#a855f7', // Purple 500
 ];
 
-export function Canvas({ data, onSave, sessionId }: CanvasProps) {
+const URLImage = ({ shape, isSelected, onSelect, onChange }: any) => {
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    const img = new window.Image();
+    img.src = shape.src;
+    img.onload = () => {
+      setImage(img);
+    };
+  }, [shape.src]);
+
+  return (
+    <KonvaImage
+      image={image || undefined}
+      x={shape.x}
+      y={shape.y}
+      width={shape.width}
+      height={shape.height}
+      draggable={true}
+      onClick={onSelect}
+      onTap={onSelect}
+      onDragEnd={(e) => {
+        onChange({
+          ...shape,
+          x: e.target.x(),
+          y: e.target.y(),
+        });
+      }}
+      onTransformEnd={(e) => {
+        const node = e.target;
+        const scaleX = node.scaleX();
+        const scaleY = node.scaleY();
+        node.scaleX(1);
+        node.scaleY(1);
+        onChange({
+          ...shape,
+          x: node.x(),
+          y: node.y(),
+          width: Math.max(5, node.width() * scaleX),
+          height: Math.max(5, node.height() * scaleY),
+        });
+      }}
+    />
+  );
+};
+
+export function Canvas({ data, onSave, sessionId, onAIAction }: CanvasProps) {
   const [tool, setTool] = useState('pencil');
   const [color, setColor] = useState('#18181b');
   const [strokeWidth, setStrokeWidth] = useState(2);
@@ -89,7 +136,7 @@ export function Canvas({ data, onSave, sessionId }: CanvasProps) {
     setRedoStack([]);
   }, [lines, shapes]);
 
-  const undo = () => {
+  const undo = useCallback(() => {
     if (history.length === 0) return;
     const previous = history[history.length - 1];
     setRedoStack(prev => [...prev, { lines: [...lines], shapes: [...shapes] }]);
@@ -97,9 +144,10 @@ export function Canvas({ data, onSave, sessionId }: CanvasProps) {
     setShapes(previous.shapes);
     setHistory(prev => prev.slice(0, -1));
     onSave(previous);
-  };
+    emitCanvasUpdate(previous.lines, previous.shapes);
+  }, [history, lines, shapes, onSave, emitCanvasUpdate]);
 
-  const redo = () => {
+  const redo = useCallback(() => {
     if (redoStack.length === 0) return;
     const next = redoStack[redoStack.length - 1];
     setHistory(prev => [...prev, { lines: [...lines], shapes: [...shapes] }]);
@@ -107,6 +155,86 @@ export function Canvas({ data, onSave, sessionId }: CanvasProps) {
     setShapes(next.shapes);
     setRedoStack(prev => prev.slice(0, -1));
     onSave(next);
+    emitCanvasUpdate(next.lines, next.shapes);
+  }, [redoStack, lines, shapes, onSave, emitCanvasUpdate]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        redo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new window.Image();
+      img.src = reader.result as string;
+      img.onload = () => {
+        const newShapes = [...shapes, {
+          id: Date.now().toString(),
+          type: 'image',
+          x: 50,
+          y: 50,
+          width: img.width > 500 ? 500 : img.width,
+          height: img.width > 500 ? (img.height * 500) / img.width : img.height,
+          src: reader.result
+        }];
+        setShapes(newShapes);
+        saveToHistory();
+        onSave({ lines, shapes: newShapes });
+        emitCanvasUpdate(lines, newShapes);
+      };
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAIImageGeneration = async () => {
+    if (!onAIAction) return;
+    const prompt = window.prompt('Enter prompt for AI Image Generation:');
+    if (!prompt) return;
+
+    try {
+      const result = await onAIAction(`Generate an image based on this prompt: ${prompt}. Return ONLY a valid base64 image string starting with data:image/png;base64, or data:image/jpeg;base64,`, '');
+      if (result && result.startsWith('data:image')) {
+        const img = new window.Image();
+        img.src = result;
+        img.onload = () => {
+          const newShapes = [...shapes, {
+            id: Date.now().toString(),
+            type: 'image',
+            x: 50,
+            y: 50,
+            width: img.width > 500 ? 500 : img.width,
+            height: img.width > 500 ? (img.height * 500) / img.width : img.height,
+            src: result
+          }];
+          setShapes(newShapes);
+          saveToHistory();
+          onSave({ lines, shapes: newShapes });
+          emitCanvasUpdate(lines, newShapes);
+        };
+      } else {
+        alert('Failed to generate image. The AI did not return a valid base64 string.');
+      }
+    } catch (error) {
+      console.error('AI Image Generation failed:', error);
+      alert('AI Image Generation failed.');
+    }
   };
 
   const handleMouseDown = (e: any) => {
@@ -170,6 +298,26 @@ export function Canvas({ data, onSave, sessionId }: CanvasProps) {
           text,
           fontSize: 20,
           fill: color
+        }];
+        setShapes(newShapes);
+        isDrawing.current = false;
+        onSave({ lines, shapes: newShapes });
+        emitCanvasUpdate(lines, newShapes);
+      }
+    } else if (tool === 'sticky') {
+      const text = window.prompt('Enter sticky note text:');
+      if (text) {
+        const newShapes = [...shapes, {
+          id: Date.now().toString(),
+          type: 'sticky',
+          x: pos.x,
+          y: pos.y,
+          width: 150,
+          height: 150,
+          text,
+          fill: '#fef08a', // Yellow 200
+          stroke: '#eab308', // Yellow 500
+          strokeWidth: 1
         }];
         setShapes(newShapes);
         isDrawing.current = false;
@@ -279,6 +427,7 @@ export function Canvas({ data, onSave, sessionId }: CanvasProps) {
             { id: 'rect', icon: Square, label: 'Rectangle' },
             { id: 'circle', icon: CircleIcon, label: 'Circle' },
             { id: 'text', icon: Type, label: 'Text' },
+            { id: 'sticky', icon: StickyNote, label: 'Sticky Note' },
           ].map((t) => (
             <button
               key={t.id}
@@ -292,6 +441,14 @@ export function Canvas({ data, onSave, sessionId }: CanvasProps) {
               <t.icon className="w-5 h-5" />
             </button>
           ))}
+          <div className="w-px h-8 bg-zinc-200 mx-2" />
+          <label className="p-2.5 text-zinc-400 hover:text-zinc-900 rounded-xl hover:bg-zinc-100 transition-colors cursor-pointer" title="Upload Image">
+            <ImageIcon className="w-5 h-5" />
+            <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+          </label>
+          <button onClick={handleAIImageGeneration} className="p-2.5 text-indigo-400 hover:text-indigo-600 rounded-xl hover:bg-indigo-50 transition-colors" title="Generate Image with AI">
+            <Sparkles className="w-5 h-5" />
+          </button>
           <div className="w-px h-8 bg-zinc-200 mx-2" />
           <button 
             onClick={undo} 
@@ -310,7 +467,17 @@ export function Canvas({ data, onSave, sessionId }: CanvasProps) {
             <Redo2 className="w-5 h-5" />
           </button>
           <div className="w-px h-8 bg-zinc-200 mx-2" />
-          <button onClick={() => { setLines([]); setShapes([]); onSave({ lines: [], shapes: [] }); }} className="p-2.5 text-zinc-400 hover:text-red-500 rounded-xl hover:bg-red-50 transition-colors" title="Clear All">
+          <button 
+            onClick={() => { 
+              saveToHistory();
+              setLines([]); 
+              setShapes([]); 
+              onSave({ lines: [], shapes: [] }); 
+              emitCanvasUpdate([], []);
+            }} 
+            className="p-2.5 text-zinc-400 hover:text-red-500 rounded-xl hover:bg-red-50 transition-colors" 
+            title="Clear All"
+          >
             <Trash2 className="w-5 h-5" />
           </button>
           <button onClick={downloadCanvas} className="p-2.5 text-zinc-400 hover:text-zinc-900 rounded-xl hover:bg-zinc-100 transition-colors" title="Download PNG">
@@ -364,6 +531,7 @@ export function Canvas({ data, onSave, sessionId }: CanvasProps) {
                     {...shape}
                     draggable={tool === 'select'}
                     onClick={() => handleShapeClick(shape.id)}
+                    onDragStart={saveToHistory}
                     onDragEnd={(e) => {
                       const newShapes = shapes.map(s => s.id === shape.id ? { ...s, x: e.target.x(), y: e.target.y() } : s);
                       setShapes(newShapes);
@@ -378,6 +546,7 @@ export function Canvas({ data, onSave, sessionId }: CanvasProps) {
                     {...shape}
                     draggable={tool === 'select'}
                     onClick={() => handleShapeClick(shape.id)}
+                    onDragStart={saveToHistory}
                     onDragEnd={(e) => {
                       const newShapes = shapes.map(s => s.id === shape.id ? { ...s, x: e.target.x(), y: e.target.y() } : s);
                       setShapes(newShapes);
@@ -392,6 +561,7 @@ export function Canvas({ data, onSave, sessionId }: CanvasProps) {
                     {...shape}
                     draggable={tool === 'select'}
                     onClick={() => handleShapeClick(shape.id)}
+                    onDragStart={saveToHistory}
                     onDragEnd={(e) => {
                       const newShapes = shapes.map(s => s.id === shape.id ? { ...s, x: e.target.x(), y: e.target.y() } : s);
                       setShapes(newShapes);
@@ -399,6 +569,52 @@ export function Canvas({ data, onSave, sessionId }: CanvasProps) {
                       emitCanvasUpdate(lines, newShapes);
                     }}
                   />
+                )}
+                {shape.type === 'image' && (
+                  <URLImage
+                    shape={shape}
+                    isSelected={shape.id === selectedId}
+                    onSelect={() => handleShapeClick(shape.id)}
+                    onChange={(newAttrs: any) => {
+                      const newShapes = shapes.map(s => s.id === shape.id ? newAttrs : s);
+                      setShapes(newShapes);
+                      onSave({ lines, shapes: newShapes });
+                      emitCanvasUpdate(lines, newShapes);
+                    }}
+                  />
+                )}
+                {shape.type === 'sticky' && (
+                  <React.Fragment>
+                    <Rect
+                      id={shape.id}
+                      {...shape}
+                      draggable={tool === 'select'}
+                      onClick={() => handleShapeClick(shape.id)}
+                      onDragStart={saveToHistory}
+                      onDragEnd={(e) => {
+                        const newShapes = shapes.map(s => s.id === shape.id ? { ...s, x: e.target.x(), y: e.target.y() } : s);
+                        setShapes(newShapes);
+                        onSave({ lines, shapes: newShapes });
+                        emitCanvasUpdate(lines, newShapes);
+                      }}
+                      shadowColor="black"
+                      shadowBlur={10}
+                      shadowOpacity={0.2}
+                      shadowOffsetX={5}
+                      shadowOffsetY={5}
+                    />
+                    <Text
+                      x={shape.x + 10}
+                      y={shape.y + 10}
+                      width={shape.width - 20}
+                      height={shape.height - 20}
+                      text={shape.text}
+                      fontSize={16}
+                      fill="#1f2937"
+                      fontFamily="sans-serif"
+                      listening={false}
+                    />
+                  </React.Fragment>
                 )}
               </React.Fragment>
             ))}
