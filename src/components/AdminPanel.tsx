@@ -105,7 +105,7 @@ export function AdminPanel({ userProfile }: { userProfile: UserProfile }) {
             placeholder="Search users by name or email..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white border border-zinc-200 rounded-2xl py-4 pl-12 pr-4 text-sm text-zinc-900 focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:border-zinc-950 transition-all font-medium"
+            className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl py-4 pl-12 pr-4 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:border-zinc-950 dark:focus:border-zinc-50 transition-all font-medium"
           />
         </div>
         <div className="flex items-center gap-4">
@@ -116,11 +116,11 @@ export function AdminPanel({ userProfile }: { userProfile: UserProfile }) {
         </div>
       </div>
 
-      <div className="bg-white border border-zinc-200 rounded-[2.5rem] overflow-hidden shadow-sm">
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[2.5rem] overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-zinc-50 border-bottom border-zinc-100">
+              <tr className="bg-zinc-50 dark:bg-zinc-800/50 border-bottom border-zinc-100 dark:border-zinc-800">
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">User</th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Role</th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Plan</th>
@@ -128,12 +128,12 @@ export function AdminPanel({ userProfile }: { userProfile: UserProfile }) {
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100">
+            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {filteredUsers.map((u) => (
-                <tr key={u.uid} className="hover:bg-zinc-50/50 transition-colors">
+                <tr key={u.uid} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center overflow-hidden border border-zinc-200">
+                      <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-200 dark:border-zinc-700">
                         {u.photoURL ? (
                           <img src={u.photoURL} alt={u.displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
@@ -141,8 +141,8 @@ export function AdminPanel({ userProfile }: { userProfile: UserProfile }) {
                         )}
                       </div>
                       <div>
-                        <p className="text-sm font-black text-zinc-950">{u.displayName}</p>
-                        <p className="text-xs text-zinc-500 font-medium">{u.email}</p>
+                        <p className="text-sm font-black text-zinc-950 dark:text-zinc-50">{u.displayName}</p>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{u.email}</p>
                       </div>
                     </div>
                   </td>

@@ -68,15 +68,15 @@ export function Settings({
   ] as const;
 
   return (
-    <div className="flex-1 overflow-y-auto bg-zinc-50 font-sans">
+    <div className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-950 font-sans transition-colors duration-300">
       <div className="max-w-5xl mx-auto p-12 space-y-12">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
-            <h1 className="text-4xl font-black text-zinc-950 tracking-tight mb-2 uppercase italic">Settings</h1>
+            <h1 className="text-4xl font-black text-zinc-950 dark:text-zinc-50 tracking-tight mb-2 uppercase italic">Settings</h1>
             <p className="text-zinc-500 text-sm font-medium">Configure your personal experience and workspace environment.</p>
           </div>
           
-          <div className="flex bg-white p-1.5 rounded-2xl border border-zinc-200 shadow-sm overflow-x-auto no-scrollbar">
+          <div className="flex bg-white dark:bg-zinc-900 p-1.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-x-auto no-scrollbar">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -111,7 +111,7 @@ export function Settings({
                   </button>
                 </div>
                 <div>
-                  <h3 className="text-2xl font-black text-zinc-950 tracking-tight">{displayName || 'Anonymous User'}</h3>
+                  <h3 className="text-2xl font-black text-zinc-950 dark:text-zinc-50 tracking-tight">{displayName || 'Anonymous User'}</h3>
                   <p className="text-zinc-500 font-medium">{user?.email}</p>
                   <div className="mt-2 flex items-center gap-2">
                     <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-widest rounded-md border border-emerald-100">Verified</span>
@@ -142,7 +142,7 @@ export function Settings({
                       type="text"
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4 pl-12 pr-4 text-sm text-zinc-900 focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:bg-white focus:border-zinc-950 transition-all font-medium"
+                      className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-4 pl-12 pr-4 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:bg-white dark:focus:bg-zinc-900 focus:border-zinc-950 dark:focus:border-zinc-50 transition-all font-medium"
                       placeholder="Your full name"
                     />
                   </div>
@@ -351,16 +351,16 @@ export function Settings({
 
         {activeTab === 'preferences' && (
           <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="bg-white border border-zinc-200 rounded-[2rem] p-10 shadow-sm space-y-10">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[2rem] p-10 shadow-sm space-y-10">
               <div className="space-y-8">
-                <h3 className="text-lg font-black text-zinc-950 uppercase tracking-tight">Global AI Preferences</h3>
+                <h3 className="text-lg font-black text-zinc-950 dark:text-zinc-50 uppercase tracking-tight">Global AI Preferences</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                   <div className="space-y-3">
                     <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Default AI Tone</label>
                     <select
                       value={userSettings?.tone || 'Professional'}
                       onChange={(e) => onUpdateUserSettings?.({ tone: e.target.value as Tone })}
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4 px-5 text-sm text-zinc-900 focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:bg-white focus:border-zinc-950 transition-all font-bold appearance-none cursor-pointer"
+                      className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-4 px-5 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:bg-white dark:focus:bg-zinc-900 focus:border-zinc-950 dark:focus:border-zinc-50 transition-all font-bold appearance-none cursor-pointer"
                     >
                       <option value="Formal academic">Formal Academic</option>
                       <option value="Professional">Professional</option>
@@ -373,7 +373,7 @@ export function Settings({
                     <select
                       value={userSettings?.voice || 'First person'}
                       onChange={(e) => onUpdateUserSettings?.({ voice: e.target.value as Voice })}
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4 px-5 text-sm text-zinc-900 focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:bg-white focus:border-zinc-950 transition-all font-bold appearance-none cursor-pointer"
+                      className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-4 px-5 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:bg-white dark:focus:bg-zinc-900 focus:border-zinc-950 dark:focus:border-zinc-50 transition-all font-bold appearance-none cursor-pointer"
                     >
                       <option value="First person">First Person</option>
                       <option value="Second person">Second Person</option>
@@ -383,34 +383,43 @@ export function Settings({
                 </div>
               </div>
 
-              <div className="h-px bg-zinc-100" />
+              <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
 
               <div className="space-y-8">
-                <h3 className="text-lg font-black text-zinc-950 uppercase tracking-tight">Appearance & UI</h3>
+                <h3 className="text-lg font-black text-zinc-950 dark:text-zinc-50 uppercase tracking-tight">Appearance & UI</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="flex items-center justify-between p-6 bg-zinc-50 rounded-3xl border border-zinc-100">
+                  <div className="flex items-center justify-between p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-3xl border border-zinc-100 dark:border-zinc-800">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-zinc-200 rounded-2xl flex items-center justify-center">
-                        <Moon className="w-6 h-6 text-zinc-600" />
+                      <div className="w-12 h-12 bg-zinc-200 dark:bg-zinc-700 rounded-2xl flex items-center justify-center">
+                        {userSettings?.darkMode ? <Moon className="w-6 h-6 text-zinc-600 dark:text-zinc-300" /> : <Sun className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />}
                       </div>
                       <div>
-                        <h4 className="text-sm font-black text-zinc-900 uppercase tracking-tight">Dark Mode</h4>
-                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Switch to dark interface</p>
+                        <h4 className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">Dark Mode</h4>
+                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-widest">Switch to dark interface</p>
                       </div>
                     </div>
-                    <button className="w-14 h-7 rounded-full relative transition-all bg-zinc-300">
-                      <div className="absolute top-1 w-5 h-5 bg-white rounded-full transition-all shadow-sm left-1" />
+                    <button 
+                      onClick={() => onUpdateUserSettings?.({ darkMode: !userSettings?.darkMode })}
+                      className={cn(
+                        "w-14 h-7 rounded-full relative transition-all",
+                        userSettings?.darkMode ? "bg-zinc-950 shadow-lg shadow-zinc-950/20" : "bg-zinc-300"
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-1 w-5 h-5 bg-white rounded-full transition-all shadow-sm",
+                        userSettings?.darkMode ? "left-8" : "left-1"
+                      )} />
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between p-6 bg-zinc-50 rounded-3xl border border-zinc-100">
+                  <div className="flex items-center justify-between p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-3xl border border-zinc-100 dark:border-zinc-800">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center">
-                        <Bell className="w-6 h-6 text-blue-600" />
+                      <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center">
+                        <Bell className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-black text-zinc-900 uppercase tracking-tight">Notifications</h4>
-                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Enable desktop alerts</p>
+                        <h4 className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">Notifications</h4>
+                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-widest">Enable desktop alerts</p>
                       </div>
                     </div>
                     <button className="w-14 h-7 rounded-full relative transition-all bg-blue-500 shadow-lg shadow-blue-500/20">
@@ -418,14 +427,14 @@ export function Settings({
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between p-6 bg-zinc-50 rounded-3xl border border-zinc-100">
+                  <div className="flex items-center justify-between p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-3xl border border-zinc-100 dark:border-zinc-800">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center">
-                        <Volume2 className="w-6 h-6 text-purple-600" />
+                      <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-2xl flex items-center justify-center">
+                        <Volume2 className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-black text-zinc-900 uppercase tracking-tight">Sound Effects</h4>
-                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Play UI interaction sounds</p>
+                        <h4 className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">Sound Effects</h4>
+                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-widest">Play UI interaction sounds</p>
                       </div>
                     </div>
                     <button className="w-14 h-7 rounded-full relative transition-all bg-purple-500 shadow-lg shadow-purple-500/20">

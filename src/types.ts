@@ -188,6 +188,7 @@ export interface UserSettings {
   omniBotEnabled?: boolean;
   autoReadOutLoud?: boolean;
   autoGenerateAudio?: boolean;
+  darkMode?: boolean;
 }
 
 export interface AppNotification {

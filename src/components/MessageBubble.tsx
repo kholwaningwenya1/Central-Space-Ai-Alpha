@@ -159,26 +159,26 @@ export function MessageBubble({ message, conversationType = 'workspace', onGener
         className={cn("flex w-full mb-6 px-4 font-sans", isMe ? "justify-start" : "justify-end")}
       >
         <div className={cn("flex max-w-[85%] md:max-w-[70%] gap-3", isMe ? "flex-row" : "flex-row-reverse")}>
-          <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm overflow-hidden bg-white border border-zinc-200">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
             {isAssistant ? (
-              <BotIcon className="w-5 h-5 text-zinc-900" />
+              <BotIcon className="w-5 h-5 text-zinc-900 dark:text-zinc-100" />
             ) : isBot ? (
               message.senderPhoto ? (
                 <img src={message.senderPhoto} alt={message.senderName} className="w-full h-full object-cover" />
               ) : (
-                <BotIcon className="w-5 h-5 text-zinc-900" />
+                <BotIcon className="w-5 h-5 text-zinc-900 dark:text-zinc-100" />
               )
             ) : message.senderPhoto ? (
               <img src={message.senderPhoto} alt={message.senderName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             ) : (
-              <User className="w-5 h-5 text-zinc-400" />
+              <User className="w-5 h-5 text-zinc-400 dark:text-zinc-500" />
             )}
           </div>
           
           <div className="flex flex-col gap-1 relative group">
             <div className={cn(
-              "p-3 md:p-4 rounded-2xl relative shadow-sm",
-              isMe ? "bg-zinc-100 text-zinc-900 rounded-tl-sm" : "bg-blue-500 text-white rounded-tr-sm"
+              "p-3 md:p-4 rounded-2xl relative shadow-sm transition-colors duration-300",
+              isMe ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-tl-sm" : "bg-blue-500 text-white rounded-tr-sm"
             )}>
               {/* Message Content */}
               <div className={cn(
@@ -216,13 +216,13 @@ export function MessageBubble({ message, conversationType = 'workspace', onGener
 
               {/* Hover Actions */}
               <div className={cn(
-                "absolute top-0 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-white border border-zinc-200 shadow-sm rounded-full p-1 z-10",
+                "absolute top-0 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-full p-1 z-10",
                 isMe ? "right-0 translate-x-1/2" : "left-0 -translate-x-1/2"
               )}>
                 <div className="relative">
                   <button 
                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                    className="p-1.5 rounded-full text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
+                    className="p-1.5 rounded-full text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                   >
                     <Smile className="w-3.5 h-3.5" />
                   </button>
@@ -233,7 +233,7 @@ export function MessageBubble({ message, conversationType = 'workspace', onGener
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         className={cn(
-                          "absolute top-full mt-2 bg-white border border-zinc-200 shadow-xl rounded-xl p-2 flex gap-1 z-50",
+                          "absolute top-full mt-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl rounded-xl p-2 flex gap-1 z-50",
                           isMe ? "right-0" : "left-0"
                         )}
                       >
@@ -244,7 +244,7 @@ export function MessageBubble({ message, conversationType = 'workspace', onGener
                               onReact?.(emoji);
                               setShowEmojiPicker(false);
                             }}
-                            className="w-8 h-8 flex items-center justify-center hover:bg-zinc-100 rounded-lg transition-colors text-lg"
+                            className="w-8 h-8 flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors text-lg"
                           >
                             {emoji}
                           </button>

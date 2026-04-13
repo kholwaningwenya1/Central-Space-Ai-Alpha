@@ -158,24 +158,24 @@ Always be helpful, concise, and proactive. If a user asks you to perform an acti
             exit={{ opacity: 0, height: 0 }}
             className="flex-1 flex flex-col overflow-hidden"
           >
-            <div className="p-2 bg-zinc-50 border-b border-zinc-100 flex items-center justify-between text-xs">
-              <span className="text-zinc-500 font-medium px-2">Mode:</span>
-              <div className="flex bg-zinc-200/50 p-0.5 rounded-lg">
+            <div className="p-2 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-100 dark:border-zinc-700 flex items-center justify-between text-xs transition-colors duration-300">
+              <span className="text-zinc-500 dark:text-zinc-400 font-medium px-2">Mode:</span>
+              <div className="flex bg-zinc-200/50 dark:bg-zinc-900/50 p-0.5 rounded-lg">
                 <button 
                   onClick={() => setMode('ask_first')}
-                  className={`px-2 py-1 rounded-md transition-all ${mode === 'ask_first' ? 'bg-white shadow-sm text-zinc-900 font-medium' : 'text-zinc-500 hover:text-zinc-700'}`}
+                  className={`px-2 py-1 rounded-md transition-all ${mode === 'ask_first' ? 'bg-white dark:bg-zinc-800 shadow-sm text-zinc-900 dark:text-zinc-100 font-medium' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'}`}
                 >
                   Ask First
                 </button>
                 <button 
                   onClick={() => setMode('ask_as_needed')}
-                  className={`px-2 py-1 rounded-md transition-all ${mode === 'ask_as_needed' ? 'bg-white shadow-sm text-zinc-900 font-medium' : 'text-zinc-500 hover:text-zinc-700'}`}
+                  className={`px-2 py-1 rounded-md transition-all ${mode === 'ask_as_needed' ? 'bg-white dark:bg-zinc-800 shadow-sm text-zinc-900 dark:text-zinc-100 font-medium' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'}`}
                 >
                   Ask As Needed
                 </button>
                 <button 
                   onClick={() => setMode('auto_decide')}
-                  className={`px-2 py-1 rounded-md transition-all ${mode === 'auto_decide' ? 'bg-white shadow-sm text-zinc-900 font-medium' : 'text-zinc-500 hover:text-zinc-700'}`}
+                  className={`px-2 py-1 rounded-md transition-all ${mode === 'auto_decide' ? 'bg-white dark:bg-zinc-800 shadow-sm text-zinc-900 dark:text-zinc-100 font-medium' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'}`}
                 >
                   Auto Decide
                 </button>
@@ -184,16 +184,16 @@ Always be helpful, concise, and proactive. If a user asks you to perform an acti
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {messages.map(m => (
                 <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${m.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-900'}`}>
+                  <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm transition-colors duration-300 ${m.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'}`}>
                     {m.content}
                   </div>
                 </div>
               ))}
               {isLoading && (
                 <div className="flex justify-start">
-                  <div className="bg-zinc-100 rounded-2xl px-4 py-2.5 flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-zinc-500" />
-                    <span className="text-xs font-medium text-zinc-500">Thinking...</span>
+                  <div className="bg-zinc-100 dark:bg-zinc-800 rounded-2xl px-4 py-2.5 flex items-center gap-2 transition-colors duration-300">
+                    <Loader2 className="w-4 h-4 animate-spin text-zinc-500 dark:text-zinc-400" />
+                    <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Thinking...</span>
                   </div>
                 </div>
               )}
@@ -201,11 +201,11 @@ Always be helpful, concise, and proactive. If a user asks you to perform an acti
             </div>
 
             {/* Input Area */}
-            <div className="p-3 border-t border-zinc-100 bg-white">
+            <div className="p-3 border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 transition-colors duration-300">
               <div className="flex items-center gap-2">
                 <button 
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-xl transition-colors"
+                  className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"
                   title="Upload files (zip, images, docs, xlsx, etc.)"
                 >
                   <Paperclip className="w-5 h-5" />
@@ -224,12 +224,12 @@ Always be helpful, concise, and proactive. If a user asks you to perform an acti
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleSend()}
                   placeholder="Ask OmniBot to do anything..."
-                  className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-colors"
                 />
                 
                 <button 
                   onClick={toggleListen}
-                  className={`p-2 rounded-xl transition-colors ${isListening ? 'bg-red-100 text-red-600' : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100'}`}
+                  className={`p-2 rounded-xl transition-colors ${isListening ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
                 >
                   <Mic className="w-5 h-5" />
                 </button>

@@ -194,14 +194,39 @@ export default function App() {
   
   // Voice Recording State
   const [isRecording, setIsRecording] = useState(false);
-  const [userSettings, setUserSettings] = useState<UserSettings>({
-    tone: 'Professional',
-    voice: 'Second person',
-    sidebarCollapsed: false,
-    omniBotEnabled: true,
-    autoReadOutLoud: false,
-    autoGenerateAudio: false
+  const [userSettings, setUserSettings] = useState<UserSettings>(() => {
+    const saved = localStorage.getItem('userSettings');
+    const defaultSettings: UserSettings = {
+      tone: 'Professional',
+      voice: 'Second person',
+      sidebarCollapsed: false,
+      omniBotEnabled: true,
+      autoReadOutLoud: false,
+      autoGenerateAudio: false,
+      darkMode: false
+    };
+    if (saved) {
+      try {
+        return { ...defaultSettings, ...JSON.parse(saved) };
+      } catch (e) {
+        return defaultSettings;
+      }
+    }
+    return defaultSettings;
   });
+
+  // Persist settings to localStorage
+  useEffect(() => {
+    localStorage.setItem('userSettings', JSON.stringify(userSettings));
+    
+    // Apply dark mode class
+    if (userSettings.darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [userSettings]);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -1884,7 +1909,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <div className="flex h-screen bg-zinc-50 overflow-hidden relative">
+      <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950 overflow-hidden relative transition-colors duration-300">
         {/* Mobile Sidebar Overlay */}
         <AnimatePresence>
           {isMobileView && !isSidebarCollapsed && (
@@ -2076,7 +2101,7 @@ export default function App() {
 
         <main className="flex-1 flex flex-col relative w-full min-w-0">
           {/* Header */}
-          <header className="h-14 border-b border-zinc-200 bg-white flex items-center justify-between px-4 md:px-6 shrink-0 z-10">
+          <header className="h-14 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 md:px-6 shrink-0 z-10 transition-colors duration-300">
             <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
               {isMobileView && (
                 <button 
@@ -2086,7 +2111,7 @@ export default function App() {
                   <Menu className="w-5 h-5" />
                 </button>
               )}
-              <h2 className="text-sm font-semibold text-zinc-900 truncate max-w-[120px] md:max-w-[200px]">
+              <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate max-w-[120px] md:max-w-[200px]">
                 {currentSession?.title || 'No Workspace Selected'}
               </h2>
               <div className="h-4 w-px bg-zinc-200" />

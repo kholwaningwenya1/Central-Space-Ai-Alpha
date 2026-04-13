@@ -99,13 +99,13 @@ export function Billing({ userProfile, onPlanUpdate }: BillingProps) {
             )}
           >
             <div className="mb-6">
-              <h3 className="text-xl font-black text-zinc-950 uppercase tracking-tight mb-1">{plan.name}</h3>
-              <p className="text-xs text-zinc-500 font-medium">{plan.description}</p>
+              <h3 className="text-xl font-black text-zinc-950 dark:text-zinc-50 uppercase tracking-tight mb-1">{plan.name}</h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{plan.description}</p>
             </div>
 
             <div className="mb-8">
               <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-black text-zinc-950">${plan.price}</span>
+                <span className="text-4xl font-black text-zinc-950 dark:text-zinc-50">${plan.price}</span>
                 <span className="text-zinc-400 text-xs font-bold uppercase tracking-widest">/mo</span>
               </div>
               {plan.price > 0 && (
@@ -116,16 +116,16 @@ export function Billing({ userProfile, onPlanUpdate }: BillingProps) {
             <div className="flex-1 space-y-4 mb-10">
               {plan.features.map((feature, i) => (
                 <div key={i} className="flex items-start gap-3">
-                  <div className="w-5 h-5 rounded-full bg-zinc-100 flex items-center justify-center shrink-0 mt-0.5">
-                    <Check className="w-3 h-3 text-zinc-950" />
+                  <div className="w-5 h-5 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 mt-0.5">
+                    <Check className="w-3 h-3 text-zinc-950 dark:text-zinc-50" />
                   </div>
-                  <span className="text-xs text-zinc-600 font-medium leading-tight">{feature}</span>
+                  <span className="text-xs text-zinc-600 dark:text-zinc-300 font-medium leading-tight">{feature}</span>
                 </div>
               ))}
             </div>
 
             {userProfile.plan === plan.id ? (
-              <div className="w-full py-4 bg-emerald-50 text-emerald-600 rounded-2xl text-xs font-black uppercase tracking-widest text-center border border-emerald-100">
+              <div className="w-full py-4 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-2xl text-xs font-black uppercase tracking-widest text-center border border-emerald-100 dark:border-emerald-900/50">
                 Current Plan
               </div>
             ) : plan.price === 0 ? (
@@ -137,16 +137,16 @@ export function Billing({ userProfile, onPlanUpdate }: BillingProps) {
               </button>
             ) : (
               <div className="space-y-4">
-                <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 mb-4">
-                  <h4 className="text-[10px] font-black text-zinc-950 uppercase tracking-widest mb-2 flex items-center gap-2">
+                <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 mb-4">
+                  <h4 className="text-[10px] font-black text-zinc-950 dark:text-zinc-50 uppercase tracking-widest mb-2 flex items-center gap-2">
                     <CreditCard className="w-3 h-3" /> Payment Options
                   </h4>
                   <div className="space-y-2">
-                    <div className="text-[10px] text-zinc-500 leading-tight">
-                      <span className="font-bold text-zinc-900 uppercase">Debit or Credit Card:</span> Pay securely using your Visa, Mastercard, or Amex via our encrypted gateway.
+                    <div className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-tight">
+                      <span className="font-bold text-zinc-900 dark:text-zinc-200 uppercase">Debit or Credit Card:</span> Pay securely using your Visa, Mastercard, or Amex via our encrypted gateway.
                     </div>
-                    <div className="text-[10px] text-zinc-500 leading-tight">
-                      <span className="font-bold text-zinc-900 uppercase">Pay Later:</span> Split your payment into interest-free installments (Available via PayPal in select regions).
+                    <div className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-tight">
+                      <span className="font-bold text-zinc-900 dark:text-zinc-200 uppercase">Pay Later:</span> Split your payment into interest-free installments (Available via PayPal in select regions).
                     </div>
                   </div>
                 </div>
