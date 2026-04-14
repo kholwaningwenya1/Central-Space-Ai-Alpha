@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ExternalLink, Server, Shield, Zap, Globe, Plane, ShoppingCart, Store, MessageSquare } from 'lucide-react';
+import { ExternalLink, Server, Shield, Zap, Globe, Plane, ShoppingCart, Store, MessageSquare, Video, Mail, DollarSign } from 'lucide-react';
+
+interface AdCopy {
+  description: string;
+  cta: string;
+}
 
 interface Ad {
   id: string;
   title: string;
-  description: string;
-  cta: string;
+  copies: AdCopy[];
   link: string;
   icon: React.ReactNode;
   color: string;
@@ -14,115 +18,135 @@ interface Ad {
 
 const ADS: Ad[] = [
   {
+    id: 'blotato-referral',
+    title: 'Blotato',
+    link: 'https://blotato.com/?ref=kholwani',
+    icon: <Video className="w-4 h-4" />,
+    color: 'from-orange-500 to-red-600',
+    copies: [
+      { description: 'Create viral reels & post everywhere in 1 click.', cta: 'Go Viral' },
+      { description: 'One click to share reels across all platforms.', cta: 'Start Sharing' },
+      { description: 'Automate your social media reels instantly.', cta: 'Try Blotato' },
+      { description: 'The easiest way to create & sync social reels.', cta: 'Get Started' },
+      { description: 'Blast your reels to all socials with one tap.', cta: 'Boost Reach' },
+      { description: 'Professional reels made easy & shared fast.', cta: 'Create Now' },
+      { description: 'Sync your video content globally in seconds.', cta: 'Sync Now' },
+      { description: 'Turn one video into 10 social posts instantly.', cta: 'Multiply Content' },
+      { description: 'Effortless reel creation for all platforms.', cta: 'Join Blotato' },
+      { description: 'Dominate social media with 1-click reels.', cta: 'Dominate Now' }
+    ]
+  },
+  {
+    id: 'getresponse-recurring',
+    title: 'GetResponse',
+    link: 'https://www.getresponse.com?a=rwHyDqA3aE',
+    icon: <Mail className="w-4 h-4" />,
+    color: 'from-blue-500 to-indigo-600',
+    copies: [
+      { description: 'Powerful email marketing that grows with you.', cta: 'Start Free' },
+      { description: 'Automate your emails & boost conversions.', cta: 'Boost Sales' },
+      { description: 'The all-in-one platform for email success.', cta: 'Try Now' },
+      { description: 'Send better emails & build lasting relations.', cta: 'Get Response' },
+      { description: 'Scale your business with smart email tools.', cta: 'Scale Now' },
+      { description: 'Professional email templates that convert.', cta: 'View Templates' },
+      { description: 'Reach your audience\'s inbox every time.', cta: 'Improve Reach' },
+      { description: 'Email marketing made simple and effective.', cta: 'Join Today' },
+      { description: 'Smart automation for your email campaigns.', cta: 'Automate Now' },
+      { description: 'Grow your list faster with GetResponse.', cta: 'Grow List' }
+    ]
+  },
+  {
+    id: 'getresponse-bounty',
+    title: 'GR Bounty',
+    link: 'https://www.getresponse.com?ab=9JwxvqAgtt',
+    icon: <DollarSign className="w-4 h-4" />,
+    color: 'from-emerald-500 to-teal-600',
+    copies: [
+      { description: 'Join the bounty program & earn big rewards.', cta: 'Join Bounty' },
+      { description: 'Get paid for every referral you bring in.', cta: 'Start Earning' },
+      { description: 'High-paying bounty program for marketers.', cta: 'Earn Now' },
+      { description: 'Turn your traffic into cash with our bounty.', cta: 'Get Paid' },
+      { description: 'The most rewarding bounty program online.', cta: 'Sign Up' },
+      { description: 'Earn $100 for every sale you refer today.', cta: 'Claim Bounty' },
+      { description: 'Promote GetResponse & get instant payouts.', cta: 'Promote Now' },
+      { description: 'Lucrative rewards for top-tier referrers.', cta: 'Start Referring' },
+      { description: 'Fast-track your earnings with our bounty.', cta: 'Join Now' },
+      { description: 'Simple referrals, massive bounty rewards.', cta: 'Earn $100' }
+    ]
+  },
+  {
     id: 'amazon-shopping',
     title: 'Amazon',
-    description: 'Buy It Smarter, Get It Quicker & Safer With Amazon!',
-    cta: 'Shop Now',
     link: 'https://go.urtrackinglink.com/aff_c?offer_id=685&aff_id=141265',
     icon: <ShoppingCart className="w-4 h-4" />,
     color: 'from-amber-500 to-yellow-600',
+    copies: [
+      { description: 'Buy It Smarter, Get It Quicker & Safer With Amazon!', cta: 'Shop Now' },
+      { description: 'Huge deals on electronics and home essentials.', cta: 'View Deals' },
+      { description: 'Fast shipping and secure payments on all orders.', cta: 'Buy Now' }
+    ]
   },
   {
     id: 'whatchimp-ad',
     title: 'Whatchimp',
-    description: "Advertise infinitely on whatsapp with out getting burned ' buy WhatsApp APl",
-    cta: 'Buy WhatsApp API',
     link: 'https://whatchimp.com/special-offer/join/oc2uxono/',
     icon: <MessageSquare className="w-4 h-4" />,
     color: 'from-green-600 to-emerald-500',
+    copies: [
+      { description: "Advertise infinitely on whatsapp without getting burned.", cta: 'Buy API' },
+      { description: "Scale your WhatsApp marketing with official API.", cta: 'Get Started' }
+    ]
   },
   {
     id: 'nomad-esim',
     title: 'Nomad eSIM',
-    description: 'Finding reliable travel data',
-    cta: 'Trending eSIM Plans',
     link: 'https://go.urtrackinglink.com/aff_c?offer_id=1904&aff_id=141265',
     icon: <Globe className="w-4 h-4" />,
     color: 'from-indigo-500 to-purple-600',
+    copies: [
+      { description: 'Finding reliable travel data made easy.', cta: 'eSIM Plans' },
+      { description: 'Stay connected globally with affordable eSIMs.', cta: 'View Plans' }
+    ]
   },
   {
     id: 'shopify-ecommerce',
     title: 'Shopify',
-    description: 'Shopify is supporting the next generation of entrepreneurs, the world’s biggest brands, and everyone in between',
-    cta: 'Start Selling',
     link: 'https://go.urtrackinglink.com/aff_c?offer_id=1724&aff_id=141265',
     icon: <Store className="w-4 h-4" />,
     color: 'from-green-500 to-emerald-600',
-  },
-  {
-    id: 'air-india',
-    title: 'Air India',
-    description: 'Book Air India Online Booking — Start creating Book Air India booking online easily',
-    cta: 'Book Now',
-    link: 'https://go.urtrackinglink.com/aff_c?offer_id=1777&aff_id=141265',
-    icon: <Plane className="w-4 h-4" />,
-    color: 'from-red-500 to-orange-600',
-  },
-  {
-    id: 'aviator-betting',
-    title: 'Aviator',
-    description: 'Signup & Play | Spin & Win | Learn how to win big.',
-    cta: 'Play Now',
-    link: 'https://data527.click/c26f429e554649afce43/e0009e4b1c/?placementName=default',
-    icon: <Plane className="w-4 h-4" />,
-    color: 'from-red-600 to-orange-500',
-  },
-  {
-    id: 'hostry-main',
-    title: 'Hostry',
-    description: 'Reliable & well-established hosting service provider.',
-    cta: 'Visit Page',
-    link: 'https://hostry.com/?ref=V3F2V7E5',
-    icon: <Server className="w-4 h-4" />,
-    color: 'from-rose-500 to-orange-500',
-  },
-  {
-    id: 'hostry-cdn',
-    title: 'Hostry CDN',
-    description: 'Lightning fast global content delivery network.',
-    cta: 'Get Started',
-    link: 'https://hostry.com/?ref=V3F2V7E5',
-    icon: <Globe className="w-4 h-4" />,
-    color: 'from-blue-500 to-cyan-500',
-  },
-  {
-    id: 'hostry-ssl',
-    title: 'Hostry SSL',
-    description: 'Secure your website with top-tier SSL certificates.',
-    cta: 'Secure Now',
-    link: 'https://hostry.com/?ref=V3F2V7E5',
-    icon: <Shield className="w-4 h-4" />,
-    color: 'from-emerald-500 to-teal-500',
-  },
-  {
-    id: 'hostry-vps',
-    title: 'Hostry VPS',
-    description: 'High-performance virtual private servers for your apps.',
-    cta: 'Deploy',
-    link: 'https://hostry.com/?ref=V3F2V7E5',
-    icon: <Zap className="w-4 h-4" />,
-    color: 'from-purple-500 to-pink-500',
+    copies: [
+      { description: 'Support the next generation of entrepreneurs.', cta: 'Start Selling' },
+      { description: 'Build your dream online store in minutes.', cta: 'Free Trial' }
+    ]
   },
   {
     id: 'gethost-hosting',
     title: 'Gethost',
-    description: 'Empower Your Online Presence with Zimbabwe’s Leading Web Hosting & Domain Provider.',
-    cta: 'Get Hosting',
     link: 'https://gethost.co.zw/clients/aff.php?aff=101',
     icon: <Server className="w-4 h-4" />,
     color: 'from-blue-600 to-indigo-700',
+    copies: [
+      { description: 'Zimbabwe’s Leading Web Hosting & Domain Provider.', cta: 'Get Hosting' },
+      { description: 'Reliable SSD hosting with 99.9% uptime.', cta: 'Host Now' }
+    ]
   }
 ];
 
 export function AdBanner() {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentCopy, setCurrentCopy] = useState<AdCopy>(ADS[0].copies[0]);
 
   useEffect(() => {
     // Random rotation between 8 to 14 seconds
     const intervalTime = Math.floor(Math.random() * (14000 - 8000 + 1) + 8000);
     
     const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % ADS.length);
+      const nextIndex = (currentIndex + 1) % ADS.length;
+      const nextAd = ADS[nextIndex];
+      const randomCopy = nextAd.copies[Math.floor(Math.random() * nextAd.copies.length)];
+      
+      setCurrentIndex(nextIndex);
+      setCurrentCopy(randomCopy);
     }, intervalTime);
 
     return () => clearInterval(timer);
@@ -137,7 +161,7 @@ export function AdBanner() {
       
       <AnimatePresence mode="popLayout">
         <motion.a
-          key={currentAd.id}
+          key={`${currentAd.id}-${currentCopy.description}`}
           href={currentAd.link}
           target="_blank"
           rel="noopener noreferrer"
@@ -153,13 +177,13 @@ export function AdBanner() {
             </div>
             <div className="flex items-center gap-2.5 truncate">
               <span className="text-xs font-black text-white tracking-widest uppercase drop-shadow-md">{currentAd.title}</span>
-              <span className="text-[11px] text-zinc-300 font-medium truncate hidden sm:inline-block drop-shadow-sm">— {currentAd.description}</span>
+              <span className="text-[11px] text-zinc-300 font-medium truncate hidden sm:inline-block drop-shadow-sm">— {currentCopy.description}</span>
             </div>
           </div>
           
           <div className="flex items-center gap-2 shrink-0 ml-4 bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm border border-white/10 group-hover:bg-white/20 transition-all">
             <span className={`text-[10px] font-bold text-white uppercase tracking-wider`}>
-              {currentAd.cta}
+              {currentCopy.cta}
             </span>
             <ExternalLink className="w-3 h-3 text-white/70 group-hover:text-white transition-colors" />
           </div>
