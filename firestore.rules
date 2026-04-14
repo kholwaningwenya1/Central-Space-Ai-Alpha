@@ -199,7 +199,7 @@ service cloud.firestore {
              data.title is string && data.title.size() <= 200 &&
              data.messages is list && data.messages.size() <= 1000 &&
              data.uid is string &&
-             data.mode in ['chat', 'canvas', 'library', 'settings', 'units', 'document', 'directory', 'bots', 'media', 'billing', 'admin'] &&
+             data.mode in ['chat', 'canvas', 'library', 'settings', 'units', 'document', 'directory', 'bots', 'media', 'billing', 'admin', 'blueprint'] &&
              data.type in ['direct', 'group', 'channel', 'workspace'] &&
              data.members is list && data.members.size() <= 100 &&
              data.updatedAt is number &&
@@ -217,7 +217,9 @@ service cloud.firestore {
              (!('modelId' in data) || data.modelId is string) &&
              (!('searchEnabled' in data) || data.searchEnabled is bool) &&
              (!('privacyMode' in data) || data.privacyMode is bool) &&
-             (!('isFavorite' in data) || data.isFavorite is bool);
+             (!('isFavorite' in data) || data.isFavorite is bool) &&
+             (!('resultType' in data) || data.resultType is string) &&
+             (!('ttsVoice' in data) || data.ttsVoice is string);
     }
 
     // ===============================================================

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { ExternalLink, Server, Shield, Zap, Globe, Plane, ShoppingCart, Store, MessageSquare } from 'lucide-react';
 
 interface Ad {
@@ -102,6 +102,15 @@ const ADS: Ad[] = [
     link: 'https://hostry.com/?ref=V3F2V7E5',
     icon: <Zap className="w-4 h-4" />,
     color: 'from-purple-500 to-pink-500',
+  },
+  {
+    id: 'gethost-hosting',
+    title: 'Gethost',
+    description: 'Empower Your Online Presence with Zimbabwe’s Leading Web Hosting & Domain Provider.',
+    cta: 'Get Hosting',
+    link: 'https://gethost.co.zw/clients/aff.php?aff=101',
+    icon: <Server className="w-4 h-4" />,
+    color: 'from-blue-600 to-indigo-700',
   }
 ];
 

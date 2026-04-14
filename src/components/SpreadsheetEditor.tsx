@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Download, Upload, Plus, Trash2, Save, BarChart3, PieChart, LineChart, Table2, Sparkles, Loader2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { toast } from 'sonner';
 
 interface SpreadsheetEditorProps {

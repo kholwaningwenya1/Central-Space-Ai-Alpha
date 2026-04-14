@@ -241,8 +241,13 @@ async function startServer() {
         try {
           responseText = await tryOpenAI(modelId) || "";
         } catch (e) {
-          console.warn("OpenAI failed, falling back to Gemini", e);
-          responseText = await tryGemini('gemini-3-flash-preview') || "";
+          console.warn("OpenAI failed, falling back to Anthropic", e);
+          try {
+            responseText = await tryAnthropic('claude-3-5-sonnet-20240620') || "";
+          } catch (ae) {
+            console.warn("Anthropic fallback failed, trying Gemini", ae);
+            responseText = await tryGemini('gemini-3-flash-preview') || "";
+          }
         }
       } else if (modelId.startsWith('claude')) {
         try {
@@ -260,10 +265,15 @@ async function startServer() {
         }
       } else {
         try {
-          responseText = await tryGemini('gemini-3-flash-preview') || "";
-        } catch (e) {
-          console.warn("Gemini fallback failed, trying OpenAI", e);
           responseText = await tryOpenAI('gpt-4o') || "";
+        } catch (e) {
+          console.warn("OpenAI fallback failed, trying Anthropic", e);
+          try {
+            responseText = await tryAnthropic('claude-3-5-sonnet-20240620') || "";
+          } catch (ae) {
+            console.warn("Anthropic fallback failed, trying Gemini", ae);
+            responseText = await tryGemini('gemini-3-flash-preview') || "";
+          }
         }
       }
 
@@ -284,11 +294,46 @@ async function startServer() {
         prompt: prompt,
         n: 1,
         size: "1024x1024",
+        response_format: "b64_json"
       });
 
-      res.json({ url: response.data[0].url });
+      res.json({ url: `data:image/png;base64,${response.data[0].b64_json}` });
     } catch (error: any) {
       console.error("Image Generation Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tts", async (req, res) => {
+    const { text, voice = 'alloy' } = req.body;
+    if (!openai) return res.status(500).json({ error: "OpenAI API key not configured" });
+
+    try {
+      const mp3 = await openai.audio.speech.create({
+        model: "tts-1",
+        voice: voice as any,
+        input: text,
+      });
+      const buffer = Buffer.from(await mp3.arrayBuffer());
+      const base64 = buffer.toString('base64');
+      res.json({ audio: `data:audio/mpeg;base64,${base64}` });
+    } catch (error: any) {
+      console.error("TTS Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/proxy-image", async (req, res) => {
+    const { url } = req.query;
+    if (!url || typeof url !== 'string') return res.status(400).json({ error: "URL is required" });
+
+    try {
+      const response = await fetch(url);
+      const buffer = await response.arrayBuffer();
+      const contentType = response.headers.get('content-type') || 'image/png';
+      res.setHeader('Content-Type', contentType);
+      res.send(Buffer.from(buffer));
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });

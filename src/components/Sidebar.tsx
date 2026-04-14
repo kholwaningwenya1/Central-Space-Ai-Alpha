@@ -236,19 +236,19 @@ export function Sidebar({
           )}
           {[
             { id: 'chat', icon: MessageSquare, label: 'Chat & Research' },
-            { id: 'media', icon: Sparkles, label: 'Media Hub', requiredPlan: 'advanced' },
+            { id: 'media', icon: Sparkles, label: 'Media Hub' },
             { id: 'directory', icon: UserPlus, label: 'Directory' },
             { id: 'bots', icon: BotIcon, label: 'Bot Platform' },
-            { id: 'document', icon: FileText, label: 'Document Editor', requiredPlan: 'standard' },
-            { id: 'blueprint', icon: Ruler, label: 'Blueprint Gen', requiredPlan: 'advanced' },
-            { id: 'canvas', icon: Palette, label: 'Visual Canvas', requiredPlan: 'advanced' },
+            { id: 'document', icon: FileText, label: 'Document Editor' },
+            { id: 'blueprint', icon: Ruler, label: 'Blueprint Gen' },
+            { id: 'canvas', icon: Palette, label: 'Visual Canvas' },
             { id: 'library', icon: LibraryIcon, label: 'File Library' },
             { id: 'settings', icon: Settings, label: 'Settings' },
             { id: 'billing', icon: CreditCard, label: 'Billing & Plans' },
           ].map((mode) => (
             <button
               key={mode.id}
-              onClick={() => handleModeClick(mode.id as SessionMode, mode.requiredPlan)}
+              onClick={() => handleModeClick(mode.id as SessionMode)}
               className={cn(
                 "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group",
                 currentMode === mode.id 

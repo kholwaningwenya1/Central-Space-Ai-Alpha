@@ -413,13 +413,21 @@ export default function App() {
   };
 
   const handleDeleteTemplate = async (templateId: string) => {
-    try {
-      await deleteDoc(doc(db, 'templates', templateId));
-      toast.success('Template deleted');
-    } catch (error) {
-      console.error('Failed to delete template', error);
-      toast.error('Failed to delete template');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Template',
+      message: 'Are you sure you want to delete this template? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'templates', templateId));
+          toast.success('Template deleted');
+        } catch (error) {
+          console.error('Failed to delete template', error);
+          toast.error('Failed to delete template');
+        }
+        setConfirmModal(null);
+      }
+    });
   };
 
   const handleRevertVersion = async (version: DocumentVersion) => {
@@ -497,6 +505,11 @@ export default function App() {
       return;
     }
     
+    const hasKey = await (window as any).aistudio?.hasSelectedApiKey?.();
+    if (!hasKey) {
+      await (window as any).aistudio?.openSelectKey?.();
+    }
+
     setIsGeneratingVideo(true);
     try {
       const videoUrl = await generateVideoFromPrompt(prompt);
@@ -2394,81 +2407,41 @@ export default function App() {
           {/* Main Content Area */}
           <div className="flex-1 overflow-hidden flex flex-col relative">
             {currentSession?.mode === 'document' ? (
-              userProfile?.role === 'super_admin' || ['standard', 'advanced', 'corporate'].includes(userProfile?.plan || 'free') ? (
-                <DocumentEditor 
-                  data={currentSession.documentData || ''} 
-                  onSave={handleSaveDocument}
-                  onAIAction={handleDocumentAIAction}
-                  presence={roomUsers.reduce((acc, u) => ({...acc, [u.uid || u.id]: { uid: u.uid || u.id, displayName: u.displayName || u.name, photoURL: u.photoURL || u.avatar, lastActive: Date.now(), status: 'online' }}), {})}
-                  sessionId={currentSessionId || ''}
-                  versions={currentSession.documentVersions}
-                  onRevert={handleRevertVersion}
-                  templates={templates}
-                  onSaveTemplate={handleSaveTemplate}
-                  onDeleteTemplate={handleDeleteTemplate}
-                />
-              ) : (
-                <div className="flex-1 flex items-center justify-center p-12 text-center">
-                  <div className="max-w-md">
-                    <h3 className="text-2xl font-bold mb-4">Upgrade Required</h3>
-                    <p className="text-zinc-500 mb-6">The Document Editor requires the Standard plan or higher.</p>
-                    <button onClick={() => updateSession(currentSessionId!, { mode: 'billing' })} className="px-6 py-3 bg-zinc-950 text-white rounded-xl font-medium hover:bg-zinc-800">View Plans</button>
-                  </div>
-                </div>
-              )
+              <DocumentEditor 
+                data={currentSession.documentData || ''} 
+                onSave={handleSaveDocument}
+                onAIAction={handleDocumentAIAction}
+                presence={roomUsers.reduce((acc, u) => ({...acc, [u.uid || u.id]: { uid: u.uid || u.id, displayName: u.displayName || u.name, photoURL: u.photoURL || u.avatar, lastActive: Date.now(), status: 'online' }}), {})}
+                sessionId={currentSessionId || ''}
+                versions={currentSession.documentVersions}
+                onRevert={handleRevertVersion}
+                templates={templates}
+                onSaveTemplate={handleSaveTemplate}
+                onDeleteTemplate={handleDeleteTemplate}
+              />
             ) : currentSession?.mode === 'media' ? (
-              userProfile?.role === 'super_admin' || ['advanced', 'corporate'].includes(userProfile?.plan || 'free') ? (
-                <MediaHub 
-                  onSaveToLibrary={(file) => {
-                    if (!currentSessionId || !currentSession) return;
-                    const newFiles = [...(currentSession.files || []), { ...file, id: Math.random().toString(36).substr(2, 9), timestamp: Date.now() }];
-                    updateSession(currentSessionId, { files: newFiles });
-                  }}
-                />
-              ) : (
-                <div className="flex-1 flex items-center justify-center p-12 text-center">
-                  <div className="max-w-md">
-                    <h3 className="text-2xl font-bold mb-4">Upgrade Required</h3>
-                    <p className="text-zinc-500 mb-6">The Media Hub requires the Advanced plan or higher.</p>
-                    <button onClick={() => updateSession(currentSessionId!, { mode: 'billing' })} className="px-6 py-3 bg-zinc-950 text-white rounded-xl font-medium hover:bg-zinc-800">View Plans</button>
-                  </div>
-                </div>
-              )
+              <MediaHub 
+                onSaveToLibrary={(file) => {
+                  if (!currentSessionId || !currentSession) return;
+                  const newFiles = [...(currentSession.files || []), { ...file, id: Math.random().toString(36).substr(2, 9), timestamp: Date.now() }];
+                  updateSession(currentSessionId, { files: newFiles });
+                }}
+              />
             ) : currentSession?.mode === 'canvas' ? (
-              userProfile?.role === 'super_admin' || ['advanced', 'corporate'].includes(userProfile?.plan || 'free') ? (
-                <Canvas 
-                  data={currentSession.canvasData} 
-                  onSave={(canvasData) => currentSessionId && updateSession(currentSessionId, { canvasData })} 
-                  sessionId={currentSessionId || ''}
-                />
-              ) : (
-                <div className="flex-1 flex items-center justify-center p-12 text-center">
-                  <div className="max-w-md">
-                    <h3 className="text-2xl font-bold mb-4">Upgrade Required</h3>
-                    <p className="text-zinc-500 mb-6">The Visual Canvas requires the Advanced plan or higher.</p>
-                    <button onClick={() => updateSession(currentSessionId!, { mode: 'billing' })} className="px-6 py-3 bg-zinc-950 text-white rounded-xl font-medium hover:bg-zinc-800">View Plans</button>
-                  </div>
-                </div>
-              )
+              <Canvas 
+                data={currentSession.canvasData} 
+                onSave={(canvasData) => currentSessionId && updateSession(currentSessionId, { canvasData })} 
+                sessionId={currentSessionId || ''}
+              />
             ) : currentSession?.mode === 'blueprint' ? (
-              userProfile?.role === 'super_admin' || ['advanced', 'corporate'].includes(userProfile?.plan || 'free') ? (
-                <BlueprintGenerator 
-                  onAIAction={handleDocumentAIAction} 
-                  onSaveToLibrary={(file) => {
-                    if (!currentSessionId || !currentSession) return;
-                    const newFiles = [...(currentSession.files || []), { ...file, id: Math.random().toString(36).substr(2, 9), timestamp: Date.now() }];
-                    updateSession(currentSessionId, { files: newFiles });
-                  }}
-                />
-              ) : (
-                <div className="flex-1 flex items-center justify-center p-12 text-center">
-                  <div className="max-w-md">
-                    <h3 className="text-2xl font-bold mb-4">Upgrade Required</h3>
-                    <p className="text-zinc-500 mb-6">The Blueprint Generator requires the Advanced plan or higher.</p>
-                    <button onClick={() => updateSession(currentSessionId!, { mode: 'billing' })} className="px-6 py-3 bg-zinc-950 text-white rounded-xl font-medium hover:bg-zinc-800">View Plans</button>
-                  </div>
-                </div>
-              )
+              <BlueprintGenerator 
+                onAIAction={handleDocumentAIAction} 
+                onSaveToLibrary={(file) => {
+                  if (!currentSessionId || !currentSession) return;
+                  const newFiles = [...(currentSession.files || []), { ...file, id: Math.random().toString(36).substr(2, 9), timestamp: Date.now() }];
+                  updateSession(currentSessionId, { files: newFiles });
+                }}
+              />
             ) : currentSession?.mode === 'library' ? (
               <Library 
                 files={currentSession.files || []} 

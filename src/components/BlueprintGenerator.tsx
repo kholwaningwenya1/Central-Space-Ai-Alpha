@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Sparkles, Download, Loader2, Image as ImageIcon, Ruler, Box, Maximize2, FileDown, Layers, PlusCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Upload, Sparkles, Download, Loader2, Image as ImageIcon, Ruler, Box, Maximize2, FileDown, Layers, PlusCircle, FileText, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateImageFromPrompt, generateChatResponse } from '../services/aiService';
 import { FileData } from '../types';
 import JSZip from 'jszip';
+import { jsPDF } from 'jspdf';
 
 interface BlueprintGeneratorProps {
   onAIAction: (action: string, context: string) => Promise<string>;
@@ -60,17 +61,18 @@ export function BlueprintGenerator({ onAIAction, onSaveToLibrary }: BlueprintGen
       const analysisPrompt = `Analyze this ${uploadedImage ? 'image' : 'description'} for a ${description || 'design'}. 
       Generate 6 precise image generation prompts for different blueprint views: Front, Back, Side, Top, Isometric, and Orthographic.
       
-      CRITICAL REQUIREMENTS for Blender Reference Images:
-      1. Each view must be perfectly centered and orthographic (flat, no perspective for Front/Back/Side/Top).
-      2. The scale must be consistent across all views.
-      3. Use a clean, solid background.
-      4. The style must be ${
+      CRITICAL REQUIREMENTS for Blender 5.1.0+ Interoperability:
+      1. Each view must be PERFECTLY CENTERED and ORTHOGRAPHIC (flat, no perspective for Front/Back/Side/Top).
+      2. The SCALE must be EXACTLY CONSISTENT across all views. If the object is 2m wide in Front, it must be 2m wide in Top.
+      3. Place ACCURATE MEASUREMENTS as edge lengths (e.g., "2.5m", "150cm") directly on the drawing.
+      4. Use a clean, solid background (white for B&W/Color, deep blue for Blueprint).
+      5. The style must be ${
         style === 'bw' ? 'clean black and white technical line drawing, high contrast, no shading, professional CAD style' : 
         style === 'blue' ? 'classic architectural blueprint, white lines on deep blue background, traditional engineering style' : 
         style === 'sketch' ? 'hand-drawn architectural sketch, pencil on parchment, artistic concept style' :
         'detailed color technical render, clean lighting, clear materials, modern architectural visualization'
       }.
-      5. No text or labels inside the image.
+      6. Ensure the object is isolated with no extraneous elements.
       
       Return the result as a JSON array of objects with "view" and "prompt" fields. Only return the JSON.`;
 
@@ -183,6 +185,112 @@ export function BlueprintGenerator({ onAIAction, onSaveToLibrary }: BlueprintGen
     } catch (error) {
       console.error('Failed to save to library', error);
       toast.error('Failed to save blueprint');
+    }
+  };
+
+  const [isGeneratingGuide, setIsGeneratingGuide] = useState(false);
+
+  const generateBlenderGuide = async () => {
+    if (blueprints.length === 0) {
+      toast.error('Please generate blueprints first.');
+      return;
+    }
+
+    setIsGeneratingGuide(true);
+    try {
+      const guidePrompt = `Create a comprehensive, step-by-step tutorial for modeling the following design in Blender 5.1.0 or later using the provided blueprints.
+      Design Description: ${description || 'Custom Object'}
+      Views available: ${blueprints.map(b => b.view).join(', ')}
+      
+      The tutorial must include:
+      1. Setting up the workspace (Units, Grid scale).
+      2. Importing blueprints as Background Images/Reference Images (Shift + A -> Image -> Reference).
+      3. Aligning views (Front, Side, Top) to match dimensions.
+      4. Modeling techniques (Extrusion, Subdivision, Modifiers).
+      5. Essential Shortcut Keys for Blender 5.1.0+.
+      6. Tips for achieving accurate edge lengths as specified in the blueprints.
+      7. Animation basics for this specific model.
+      
+      Format the output as a structured tutorial with clear headings and bullet points.`;
+
+      const response = await generateChatResponse(
+        [{ role: 'user', content: guidePrompt }],
+        { tone: 'Professional', voice: 'Third person', modelId: 'gpt-4o' }
+      );
+
+      const doc = new jsPDF();
+      const margin = 20;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const maxLineWidth = pageWidth - margin * 2;
+      
+      doc.setFontSize(22);
+      doc.setTextColor(24, 24, 27); // zinc-900
+      doc.text("Blender 5.1.0+ Modeling Guide", margin, 30);
+      
+      doc.setFontSize(12);
+      doc.setTextColor(113, 113, 122); // zinc-500
+      doc.text(`Generated for: ${description || 'Custom Design'}`, margin, 40);
+      
+      doc.setDrawColor(228, 228, 231); // zinc-200
+      doc.line(margin, 45, pageWidth - margin, 45);
+
+      let yPos = 55;
+      doc.setFontSize(10);
+      doc.setTextColor(39, 39, 42); // zinc-800
+      
+      const lines = doc.splitTextToSize(response.text, maxLineWidth);
+      
+      lines.forEach((line: string) => {
+        if (yPos > 280) {
+          doc.addPage();
+          yPos = 20;
+        }
+        
+        if (line.startsWith('#')) {
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(14);
+          yPos += 5;
+        } else {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(10);
+        }
+        
+        doc.text(line, margin, yPos);
+        yPos += 6;
+      });
+
+      // Add blueprints to the end of the PDF
+      doc.addPage();
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("Reference Blueprints", margin, 30);
+      
+      let imgY = 40;
+      for (const bp of blueprints) {
+        if (imgY > 220) {
+          doc.addPage();
+          imgY = 20;
+        }
+        
+        try {
+          // We need to proxy the image to avoid CORS if it's external, 
+          // but since we updated server.ts to return base64, it should be fine.
+          doc.setFontSize(10);
+          doc.text(`View: ${bp.view}`, margin, imgY);
+          doc.addImage(bp.url, 'PNG', margin, imgY + 5, 80, 80);
+          imgY += 95;
+        } catch (e) {
+          console.error("Failed to add image to PDF", e);
+        }
+      }
+
+      doc.save(`Blender-Guide-${Date.now()}.pdf`);
+      toast.success('Blender guide generated successfully');
+    } catch (error) {
+      console.error('Guide generation failed', error);
+      toast.error('Failed to generate Blender guide');
+    } finally {
+      setIsGeneratingGuide(false);
     }
   };
 
@@ -316,6 +424,14 @@ export function BlueprintGenerator({ onAIAction, onSaveToLibrary }: BlueprintGen
                 <div className="flex items-center gap-3">
                   {blueprints.length > 0 && (
                     <>
+                      <button 
+                        onClick={generateBlenderGuide}
+                        disabled={isGeneratingGuide}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                      >
+                        {isGeneratingGuide ? <Loader2 className="w-3 h-3 animate-spin" /> : <BookOpen className="w-3 h-3" />}
+                        Blender Guide
+                      </button>
                       <button 
                         onClick={downloadAll}
                         disabled={isZipping}

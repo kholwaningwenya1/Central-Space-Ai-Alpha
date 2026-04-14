@@ -1,4 +1,5 @@
 import { Tone, Voice, FileData, AIModel, Bot } from "../types";
+import { GoogleGenAI } from "@google/genai";
 
 const SYSTEM_INSTRUCTION_BASE = `You are Central Space AI, an all‑in‑one workspace assistant for research, document creation, coding, data analysis, and media generation. Your primary goal is to help the user think, create, and iterate efficiently inside a single central space.
 
@@ -255,7 +256,45 @@ export async function generateVideoFromPrompt(
     referenceImages?: string[];
   }
 ): Promise<string> {
-  throw new Error('Video generation is not supported.');
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  const config: any = {
+    numberOfVideos: 1,
+    resolution: options?.resolution || '1080p',
+    aspectRatio: options?.aspectRatio || '16:9'
+  };
+
+  if (options?.referenceImages && options.referenceImages.length > 0) {
+    const referenceImagesPayload = options.referenceImages.map(img => {
+      const base64Data = img.split(',')[1] || img;
+      return {
+        image: {
+          imageBytes: base64Data,
+          mimeType: 'image/png',
+        },
+        referenceType: 'ASSET',
+      };
+    });
+    config.referenceImages = referenceImagesPayload;
+    config.resolution = '720p'; // Required for reference images
+    config.aspectRatio = '16:9'; // Required for reference images
+  }
+
+  let operation = await ai.models.generateVideos({
+    model: options?.referenceImages && options.referenceImages.length > 0 ? 'veo-3.1-generate-preview' : 'veo-3.1-lite-generate-preview',
+    prompt: prompt,
+    config: config
+  });
+
+  while (!operation.done) {
+    await new Promise(resolve => setTimeout(resolve, 10000));
+    operation = await ai.operations.getVideosOperation({operation: operation});
+  }
+
+  const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+  if (!downloadLink) throw new Error('Video generation failed');
+
+  return downloadLink;
 }
 
 export async function enhancePrompt(prompt: string, type: 'image' | 'video') {

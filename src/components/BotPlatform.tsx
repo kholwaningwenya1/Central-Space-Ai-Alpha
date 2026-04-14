@@ -27,7 +27,8 @@ import {
   FileText,
   Music,
   Users as UsersIcon,
-  MessageSquare
+  MessageSquare,
+  AlertCircle
 } from 'lucide-react';
 import { Bot, Message, AIModel } from '../types';
 import { db, collection, onSnapshot, query, where, doc, setDoc, deleteDoc } from '../firebase';
@@ -56,6 +57,7 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
   const [editingBotId, setEditingBotId] = useState<string | null>(null);
   const [viewingBot, setViewingBot] = useState<Bot | null>(null);
   const [deployingBot, setDeployingBot] = useState<Bot | null>(null);
+  const [botToDelete, setBotToDelete] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'discover' | 'my-bots'>('discover');
   const [modalTab, setModalTab] = useState<'config' | 'test'>('config');
@@ -534,8 +536,14 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
   };
 
   const handleDeleteBot = async (botId: string) => {
+    setBotToDelete(botId);
+  };
+
+  const confirmDeleteBot = async () => {
+    if (!botToDelete) return;
     try {
-      await deleteDoc(doc(db, 'bots', botId));
+      await deleteDoc(doc(db, 'bots', botToDelete));
+      setBotToDelete(null);
     } catch (error) {
       console.error("Error deleting bot:", error);
     }
@@ -1792,6 +1800,44 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
                       {deployingBot.isActive ? 'Unpublish' : 'Publish'}
                     </button>
                   </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {botToDelete && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-zinc-950/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden"
+            >
+              <div className="p-6">
+                <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center mb-4">
+                  <AlertCircle className="w-6 h-6 text-red-500" />
+                </div>
+                <h2 className="text-xl font-bold text-zinc-900 mb-2">Delete Bot</h2>
+                <p className="text-zinc-500 text-sm mb-6">
+                  Are you sure you want to delete this bot? This action cannot be undone and will permanently remove the bot and all its data.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setBotToDelete(null)}
+                    className="flex-1 px-4 py-3 bg-zinc-100 text-zinc-700 rounded-xl font-bold hover:bg-zinc-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDeleteBot}
+                    className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors"
+                  >
+                    Delete Bot
+                  </button>
                 </div>
               </div>
             </motion.div>

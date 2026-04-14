@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Image, Video, Sparkles, Download, Loader2, Maximize2, RefreshCw, Palette, Layout, Settings2, ArrowRight, Wand2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -16,7 +16,20 @@ export function MediaHub({ onSaveToLibrary }: MediaHubProps) {
   const [collaborate, setCollaborate] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
+  const [hasApiKey, setHasApiKey] = useState(true);
+
+  useEffect(() => {
+    const checkApiKey = async () => {
+      if (type === 'video') {
+        const hasKey = await (window as any).aistudio?.hasSelectedApiKey?.();
+        setHasApiKey(!!hasKey);
+      } else {
+        setHasApiKey(true);
+      }
+    };
+    checkApiKey();
+  }, [type]);
+
   // Advanced Controls
   const [style, setStyle] = useState('Cinematic');
   const [aspectRatio, setAspectRatio] = useState<any>('1:1');
@@ -50,6 +63,12 @@ export function MediaHub({ onSaveToLibrary }: MediaHubProps) {
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
+
+    if (type === 'video' && !hasApiKey) {
+      await (window as any).aistudio?.openSelectKey?.();
+      setHasApiKey(true);
+      // Assume success and proceed
+    }
 
     setIsGenerating(true);
     setResult(null);
@@ -264,6 +283,11 @@ export function MediaHub({ onSaveToLibrary }: MediaHubProps) {
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
                 Generating...
+              </>
+            ) : type === 'video' && !hasApiKey ? (
+              <>
+                Select API Key to Generate Video
+                <ArrowRight className="w-4 h-4" />
               </>
             ) : (
               <>

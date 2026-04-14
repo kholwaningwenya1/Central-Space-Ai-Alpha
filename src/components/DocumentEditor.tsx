@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Sparkles, FileText, Download, Save, Trash2, Wand2, Type, Bold, Italic, List, ListOrdered, Heading1, Heading2, Users, History, Layout, Upload, CheckCircle2, AlertCircle, X, ChevronRight, ChevronLeft, Search, Replace, Languages, FileType, MousePointer2, Table2, Loader2 } from 'lucide-react';
+import { Sparkles, FileText, Download, Save, Trash2, Wand2, Type, Bold, Italic, List, ListOrdered, Heading1, Heading2, Users, History, Layout, Upload, CheckCircle2, AlertCircle, X, ChevronRight, ChevronLeft, Search, Replace, Languages, FileType, MousePointer2, Table2, Loader2, Image as ImageIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -10,6 +10,7 @@ import mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
 import { SpreadsheetEditor } from './SpreadsheetEditor';
 import { toast } from 'sonner';
+import { generateImageFromPrompt } from '../services/aiService';
 
 // Set worker for PDF.js
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -185,6 +186,37 @@ export function DocumentEditor({
       }
     } catch (error) {
       console.error('AI Action failed:', error);
+    } finally {
+      setIsAIProcessing(false);
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    const prompt = window.prompt("Enter an image prompt (or leave blank to generate based on document content):");
+    if (prompt === null) return; // cancelled
+    
+    setIsAIProcessing(true);
+    try {
+      let finalPrompt = prompt;
+      if (!finalPrompt.trim()) {
+        toast.info("Generating prompt from document...");
+        const generatedPrompt = await onAIAction("Generate a highly detailed, descriptive prompt for an image generation AI based on the core themes of this document. Return ONLY the prompt text.", content);
+        finalPrompt = generatedPrompt;
+      }
+      
+      if (finalPrompt) {
+        toast.info("Generating image...");
+        const imageUrl = await generateImageFromPrompt(finalPrompt);
+        
+        const newContent = content + `\n\n![Generated Image](${imageUrl})\n\n`;
+        setContent(newContent);
+        onSave(newContent);
+        emitDocUpdate(newContent);
+        toast.success("Image generated and inserted!");
+      }
+    } catch (error) {
+      console.error("Image generation failed:", error);
+      toast.error("Failed to generate image");
     } finally {
       setIsAIProcessing(false);
     }
@@ -548,6 +580,15 @@ export function DocumentEditor({
             </label>
           </div>
 
+          <button 
+            onClick={handleGenerateImage}
+            disabled={isAIProcessing}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-900/10 disabled:opacity-50"
+            title="Generate Image"
+          >
+            {isAIProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+            Generate Image
+          </button>
           <button 
             onClick={() => handleAIAction('Summarize this document')}
             disabled={isAIProcessing}

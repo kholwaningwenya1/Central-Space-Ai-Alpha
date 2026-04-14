@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { Bot, X, Mic, Send, Paperclip, Loader2, Maximize2, Minimize2, Settings } from 'lucide-react';
 import { Message } from '../types';
 import { generateChatResponseStream } from '../services/aiService';

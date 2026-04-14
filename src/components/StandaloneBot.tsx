@@ -3,7 +3,7 @@ import { Bot, Message, Tone } from '../types';
 import { db, doc, onSnapshot } from '../firebase';
 import { generateChatResponseStream } from '../services/aiService';
 import { Send, Loader2, Bot as BotIcon } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 
 export function StandaloneBot({ botId }: { botId: string }) {
   const [bot, setBot] = useState<Bot | null>(null);
