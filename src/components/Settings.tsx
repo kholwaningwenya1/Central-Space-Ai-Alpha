@@ -156,7 +156,7 @@ export function Settings({
                       type="text"
                       value={photoURL}
                       onChange={(e) => setPhotoURL(e.target.value)}
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4 px-5 text-sm text-zinc-900 focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:bg-white focus:border-zinc-950 transition-all font-medium"
+                      className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-4 px-5 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:bg-white dark:focus:bg-zinc-900 focus:border-zinc-950 dark:focus:border-zinc-50 transition-all font-medium"
                       placeholder="https://example.com/avatar.jpg"
                     />
                   </div>
@@ -217,7 +217,7 @@ export function Settings({
                     type="text"
                     value={session.title}
                     onChange={(e) => onUpdateSession?.(session.id, { title: e.target.value })}
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4 px-5 text-sm text-zinc-900 focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:bg-white focus:border-zinc-950 transition-all font-medium"
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-4 px-5 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:bg-white dark:focus:bg-zinc-900 focus:border-zinc-950 dark:focus:border-zinc-50 transition-all font-medium"
                   />
                 </div>
                 <div className="space-y-3">
@@ -226,7 +226,7 @@ export function Settings({
                     type="text"
                     value={session.avatar || '📁'}
                     onChange={(e) => onUpdateSession?.(session.id, { avatar: e.target.value })}
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-4 px-5 text-sm text-zinc-900 focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:bg-white focus:border-zinc-950 transition-all font-medium"
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl py-4 px-5 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:bg-white dark:focus:bg-zinc-900 focus:border-zinc-950 dark:focus:border-zinc-50 transition-all font-medium"
                     placeholder="Enter an emoji"
                   />
                 </div>

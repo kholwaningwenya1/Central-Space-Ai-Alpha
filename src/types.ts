@@ -6,7 +6,7 @@ export type AIModel =
   | 'claude-3-5-sonnet'
   | 'claude-3-opus';
 
-export type SessionMode = 'chat' | 'canvas' | 'library' | 'settings' | 'units' | 'document' | 'directory' | 'bots' | 'media' | 'billing' | 'admin' | 'blueprint';
+export type SessionMode = 'chat' | 'search' | 'canvas' | 'library' | 'settings' | 'units' | 'document' | 'directory' | 'bots' | 'media' | 'billing' | 'admin' | 'blueprint' | 'read_it_for_me';
 export type ConversationType = 'direct' | 'group' | 'channel' | 'workspace';
 
 export type UserRole = 'super_admin' | 'admin' | 'support' | 'user';

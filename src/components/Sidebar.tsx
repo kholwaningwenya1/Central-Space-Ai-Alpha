@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   Layout,
   Library as LibraryIcon,
+  Search as SearchIcon,
   Palette,
   Cpu,
   User as UserIcon,
@@ -25,7 +26,8 @@ import {
   UserPlus,
   Bot as BotIcon,
   CreditCard,
-  Ruler
+  Ruler,
+  BookOpen
 } from 'lucide-react';
 import { Tone, Voice, AIModel, WorkspaceSession, SessionMode, Presence, ConversationType, ResultType } from '../types';
 import { cn } from '../lib/utils';
@@ -236,9 +238,11 @@ export function Sidebar({
           )}
           {[
             { id: 'chat', icon: MessageSquare, label: 'Chat & Research' },
+            { id: 'search', icon: SearchIcon, label: 'Semantic Search' },
             { id: 'media', icon: Sparkles, label: 'Media Hub' },
             { id: 'directory', icon: UserPlus, label: 'Directory' },
             { id: 'bots', icon: BotIcon, label: 'Bot Platform' },
+            { id: 'read_it_for_me', icon: BookOpen, label: 'Read It For Me' },
             { id: 'document', icon: FileText, label: 'Document Editor' },
             { id: 'blueprint', icon: Ruler, label: 'Blueprint Gen' },
             { id: 'canvas', icon: Palette, label: 'Visual Canvas' },

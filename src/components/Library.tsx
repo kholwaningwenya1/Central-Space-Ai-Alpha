@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { FileData } from '../types';
-import { File, FileText, FileSpreadsheet, Image, Video, Trash2, Download, Search, Plus, X, MessageSquare } from 'lucide-react';
+import { File, FileText, FileSpreadsheet, Image, Video, Trash2, Download, Search, Plus, X, MessageSquare, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { SemanticSearch } from './SemanticSearch';
 
 interface LibraryProps {
   files: FileData[];
@@ -12,6 +13,7 @@ interface LibraryProps {
 
 export function Library({ files, onDelete, onUpload, onChatWithLibrary }: LibraryProps) {
   const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'semantic'>('grid');
 
   const filteredFiles = files.filter(f => 
     f.name.toLowerCase().includes(search.toLowerCase())
@@ -43,6 +45,27 @@ export function Library({ files, onDelete, onUpload, onChatWithLibrary }: Librar
             <p className="text-zinc-500 text-sm">Manage and search all files in this workspace.</p>
           </div>
           <div className="flex items-center gap-4">
+            <div className="flex items-center bg-zinc-100 p-1 rounded-xl mr-2">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                  viewMode === 'grid' ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
+                )}
+              >
+                File Grid
+              </button>
+              <button
+                onClick={() => setViewMode('semantic')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
+                  viewMode === 'semantic' ? "bg-white text-indigo-600 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
+                )}
+              >
+                <Sparkles className="w-3 h-3" />
+                Semantic
+              </button>
+            </div>
             {onChatWithLibrary && files.length > 0 && (
               <button 
                 onClick={onChatWithLibrary}
@@ -75,9 +98,11 @@ export function Library({ files, onDelete, onUpload, onChatWithLibrary }: Librar
           </div>
         </div>
 
-        {/* File Grid */}
+        {/* Content Area */}
         <div className="flex-1 overflow-y-auto min-h-0">
-          {filteredFiles.length === 0 ? (
+          {viewMode === 'semantic' ? (
+            <SemanticSearch />
+          ) : filteredFiles.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-12 bg-white border border-dashed border-zinc-200 rounded-3xl">
               <div className="w-16 h-16 bg-zinc-50 rounded-2xl flex items-center justify-center mb-4">
                 <File className="w-8 h-8 text-zinc-300" />

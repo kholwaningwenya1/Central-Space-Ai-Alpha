@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ExternalLink, Server, Shield, Zap, Globe, Plane, ShoppingCart, Store, MessageSquare, Video, Mail, DollarSign } from 'lucide-react';
+import { ExternalLink, Server, Shield, Zap, Globe, Plane, ShoppingCart, Store, MessageSquare, Video, Mail, DollarSign, Sparkles, Cpu, Code, Rocket, TrendingUp, FileText, Users } from 'lucide-react';
+import { gsap } from 'gsap';
+import { cn } from '../lib/utils';
+import { getTopCategory, AdCategory } from '../lib/adTracking';
 
 interface AdCopy {
   description: string;
@@ -14,181 +17,412 @@ interface Ad {
   link: string;
   icon: React.ReactNode;
   color: string;
+  category: AdCategory;
 }
 
 const ADS: Ad[] = [
   {
-    id: 'blotato-referral',
+    id: 'gethost-zim',
+    title: 'GetHost',
+    link: 'https://gethost.co.zw/clients/aff.php?aff=101',
+    icon: <Server className="w-4 h-4" />,
+    color: 'from-blue-600 to-indigo-700',
+    category: 'coding',
+    copies: [
+      { description: 'Zimbabwe\'s #1 Web Hosting & Domain Provider.', cta: 'Host Now' },
+      { description: 'Fast, secure & affordable hosting for your business.', cta: 'Get Started' },
+      { description: 'Register .co.zw domains at the best prices today.', cta: 'Buy Domain' },
+      { description: 'Reliable SSD hosting with 99.9% uptime guarantee.', cta: 'Claim Deal' },
+      { description: 'Build your online presence with GetHost Zimbabwe.', cta: 'Visit Site' }
+    ]
+  },
+  {
+    id: 'aviator-join',
+    title: 'Join Aviator',
+    link: 'https://data527.click/81af8fd380a613288b43/61a210169e/?placementName=default',
+    icon: <Plane className="w-4 h-4" />,
+    color: 'from-red-600 to-orange-500',
+    category: 'finance',
+    copies: [
+      { description: 'Fly high and win big with Aviator. Join now!', cta: 'Play Now' },
+      { description: 'The #1 social multiplayer game. Cash out in time.', cta: 'Enter Game' },
+      { description: 'Easy to play, hard to resist. Try your luck today.', cta: 'Start Flying' },
+      { description: 'Join thousands of winners in the Aviator sky.', cta: 'Get Jackpot' },
+      { description: 'New prizes and instant payouts. Claim yours now.', cta: 'Join Event' }
+    ]
+  },
+  {
+    id: 'whatchimp-join',
+    title: 'Whatchimp',
+    link: 'https://whatchimp.com/special-offer/join/oc2uxono/',
+    icon: <Zap className="w-4 h-4" />,
+    color: 'from-yellow-500 to-orange-600',
+    category: 'business',
+    copies: [
+      { description: 'Revolutionize your workflow with Whatchimp tools.', cta: 'Join Now' },
+      { description: 'Special offer: Unlock pro features for business.', cta: 'Claim Offer' },
+      { description: 'Automate your marketing and save hours daily.', cta: 'Explore' },
+      { description: 'The ultimate tool for growth-minded entrepreneurs.', cta: 'Get Whatchimp' },
+      { description: 'Scale faster with intelligence. Try the new suite.', cta: 'Learn More' }
+    ]
+  },
+  {
+    id: 'getresponse-marketing',
+    title: 'GetResponse',
+    link: 'https://www.getresponse.com/?ab=9JwxvqAgtt',
+    icon: <Mail className="w-4 h-4" />,
+    color: 'from-blue-500 to-cyan-600',
+    category: 'business',
+    copies: [
+      { description: 'The easiest email marketing platform on the planet.', cta: 'Start Free' },
+      { description: 'Send newsletters, create pages, and automate.', cta: 'Grow List' },
+      { description: 'Full marketing automation for your online store.', cta: 'Try Now' },
+      { description: 'Generate more leads with GetResponse today.', cta: 'Get Started' },
+      { description: 'All-in-one marketing tools you actually need.', cta: 'Free Trial' }
+    ]
+  },
+  {
+    id: 'blotato-pro',
     title: 'Blotato',
     link: 'https://blotato.com/?ref=kholwani',
     icon: <Video className="w-4 h-4" />,
     color: 'from-orange-500 to-red-600',
+    category: 'tech',
     copies: [
       { description: 'Create viral reels & post everywhere in 1 click.', cta: 'Go Viral' },
-      { description: 'One click to share reels across all platforms.', cta: 'Start Sharing' },
       { description: 'Automate your social media reels instantly.', cta: 'Try Blotato' },
-      { description: 'The easiest way to create & sync social reels.', cta: 'Get Started' },
-      { description: 'Blast your reels to all socials with one tap.', cta: 'Boost Reach' },
-      { description: 'Professional reels made easy & shared fast.', cta: 'Create Now' },
-      { description: 'Sync your video content globally in seconds.', cta: 'Sync Now' },
-      { description: 'Turn one video into 10 social posts instantly.', cta: 'Multiply Content' },
-      { description: 'Effortless reel creation for all platforms.', cta: 'Join Blotato' },
-      { description: 'Dominate social media with 1-click reels.', cta: 'Dominate Now' }
-    ]
-  },
-  {
-    id: 'getresponse-recurring',
-    title: 'GetResponse',
-    link: 'https://www.getresponse.com?a=rwHyDqA3aE',
-    icon: <Mail className="w-4 h-4" />,
-    color: 'from-blue-500 to-indigo-600',
-    copies: [
-      { description: 'Powerful email marketing that grows with you.', cta: 'Start Free' },
-      { description: 'Automate your emails & boost conversions.', cta: 'Boost Sales' },
-      { description: 'The all-in-one platform for email success.', cta: 'Try Now' },
-      { description: 'Send better emails & build lasting relations.', cta: 'Get Response' },
-      { description: 'Scale your business with smart email tools.', cta: 'Scale Now' },
-      { description: 'Professional email templates that convert.', cta: 'View Templates' },
-      { description: 'Reach your audience\'s inbox every time.', cta: 'Improve Reach' },
-      { description: 'Email marketing made simple and effective.', cta: 'Join Today' },
-      { description: 'Smart automation for your email campaigns.', cta: 'Automate Now' },
-      { description: 'Grow your list faster with GetResponse.', cta: 'Grow List' }
-    ]
-  },
-  {
-    id: 'getresponse-bounty',
-    title: 'GR Bounty',
-    link: 'https://www.getresponse.com?ab=9JwxvqAgtt',
-    icon: <DollarSign className="w-4 h-4" />,
-    color: 'from-emerald-500 to-teal-600',
-    copies: [
-      { description: 'Join the bounty program & earn big rewards.', cta: 'Join Bounty' },
-      { description: 'Get paid for every referral you bring in.', cta: 'Start Earning' },
-      { description: 'High-paying bounty program for marketers.', cta: 'Earn Now' },
-      { description: 'Turn your traffic into cash with our bounty.', cta: 'Get Paid' },
-      { description: 'The most rewarding bounty program online.', cta: 'Sign Up' },
-      { description: 'Earn $100 for every sale you refer today.', cta: 'Claim Bounty' },
-      { description: 'Promote GetResponse & get instant payouts.', cta: 'Promote Now' },
-      { description: 'Lucrative rewards for top-tier referrers.', cta: 'Start Referring' },
-      { description: 'Fast-track your earnings with our bounty.', cta: 'Join Now' },
-      { description: 'Simple referrals, massive bounty rewards.', cta: 'Earn $100' }
-    ]
-  },
-  {
-    id: 'amazon-shopping',
-    title: 'Amazon',
-    link: 'https://go.urtrackinglink.com/aff_c?offer_id=685&aff_id=141265',
-    icon: <ShoppingCart className="w-4 h-4" />,
-    color: 'from-amber-500 to-yellow-600',
-    copies: [
-      { description: 'Buy It Smarter, Get It Quicker & Safer With Amazon!', cta: 'Shop Now' },
-      { description: 'Huge deals on electronics and home essentials.', cta: 'View Deals' },
-      { description: 'Fast shipping and secure payments on all orders.', cta: 'Buy Now' }
-    ]
-  },
-  {
-    id: 'whatchimp-ad',
-    title: 'Whatchimp',
-    link: 'https://whatchimp.com/special-offer/join/oc2uxono/',
-    icon: <MessageSquare className="w-4 h-4" />,
-    color: 'from-green-600 to-emerald-500',
-    copies: [
-      { description: "Advertise infinitely on whatsapp without getting burned.", cta: 'Buy API' },
-      { description: "Scale your WhatsApp marketing with official API.", cta: 'Get Started' }
-    ]
-  },
-  {
-    id: 'nomad-esim',
-    title: 'Nomad eSIM',
-    link: 'https://go.urtrackinglink.com/aff_c?offer_id=1904&aff_id=141265',
-    icon: <Globe className="w-4 h-4" />,
-    color: 'from-indigo-500 to-purple-600',
-    copies: [
-      { description: 'Finding reliable travel data made easy.', cta: 'eSIM Plans' },
-      { description: 'Stay connected globally with affordable eSIMs.', cta: 'View Plans' }
-    ]
-  },
-  {
-    id: 'shopify-ecommerce',
-    title: 'Shopify',
-    link: 'https://go.urtrackinglink.com/aff_c?offer_id=1724&aff_id=141265',
-    icon: <Store className="w-4 h-4" />,
-    color: 'from-green-500 to-emerald-600',
-    copies: [
-      { description: 'Support the next generation of entrepreneurs.', cta: 'Start Selling' },
-      { description: 'Build your dream online store in minutes.', cta: 'Free Trial' }
-    ]
-  },
-  {
-    id: 'gethost-hosting',
-    title: 'Gethost',
-    link: 'https://gethost.co.zw/clients/aff.php?aff=101',
-    icon: <Server className="w-4 h-4" />,
-    color: 'from-blue-600 to-indigo-700',
-    copies: [
-      { description: 'Zimbabwe’s Leading Web Hosting & Domain Provider.', cta: 'Get Hosting' },
-      { description: 'Reliable SSD hosting with 99.9% uptime.', cta: 'Host Now' }
+      { description: 'The smarter way to create high-impact video content.', cta: 'Check it Out' },
+      { description: 'Grow your audience with AI-powered video tools.', cta: 'Start Free' },
+      { description: 'Post to TikTok, Reels, & Shorts automatically.', cta: 'Get Tools' }
     ]
   }
 ];
 
+// Use only user provided ads
+const AD_POOL = [...ADS];
+
 export function AdBanner() {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [currentCopy, setCurrentCopy] = useState<AdCopy>(ADS[0].copies[0]);
+  const [currentAd, setCurrentAd] = useState<Ad>(AD_POOL[0]);
+  const [currentCopy, setCurrentCopy] = useState<AdCopy>(AD_POOL[0].copies[0]);
+  const [effectType, setEffectType] = useState<'liquid' | 'steam' | 'plasma' | 'holo' | 'portal' | 'glitch' | 'vortex' | 'slideLeft' | 'none'>('none');
+  const [isAdfree, setIsAdfree] = useState(false);
+  const adRef = useRef<HTMLAnchorElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const selectNextAd = useCallback(() => {
+    const topCat = getTopCategory();
+    let pool = AD_POOL;
+    
+    if (topCat) {
+      const relevant = AD_POOL.filter(a => a.category === topCat);
+      const random = AD_POOL.filter(a => a.category !== topCat);
+      
+      // 80% relevant skew for V3
+      if (Math.random() < 0.8 && relevant.length > 0) {
+        pool = relevant;
+      } else {
+        pool = random;
+      }
+    }
+
+    const nextAd = pool[Math.floor(Math.random() * pool.length)];
+    const nextCopy = nextAd.copies[Math.floor(Math.random() * nextAd.copies.length)];
+    
+    return { nextAd, nextCopy };
+  }, []);
+
+  const triggerEffect = useCallback(async () => {
+    const effects: ('liquid' | 'steam' | 'plasma' | 'holo' | 'portal' | 'glitch' | 'vortex' | 'slideLeft')[] = 
+      ['liquid', 'steam', 'plasma', 'holo', 'portal', 'glitch', 'vortex', 'slideLeft'];
+    const selectedEffect = effects[Math.floor(Math.random() * effects.length)];
+    
+    setEffectType(selectedEffect);
+
+    // GSAP V3 Orchestration
+    if (adRef.current && containerRef.current) {
+      const tl = gsap.timeline({
+        onComplete: () => {
+          setIsAdfree(true);
+          
+          // Brief "adfree" pause
+          setTimeout(() => {
+            const { nextAd, nextCopy } = selectNextAd();
+            setCurrentAd(nextAd);
+            setCurrentCopy(nextCopy);
+            setIsAdfree(false);
+            setEffectType('none');
+            
+            // Entry Animation - Randomized for dynamic feel
+            requestAnimationFrame(() => {
+              if (adRef.current) {
+                const entryStyles = [
+                  { from: { x: '100%', opacity: 0, scale: 1, rotate: 0, y: 0 }, to: { x: 0, opacity: 1, scale: 1, rotate: 0, y: 0, duration: 0.8, ease: 'power2.out' } },
+                  { from: { x: '-100%', opacity: 0, scale: 1, rotate: 0, y: 0 }, to: { x: 0, opacity: 1, scale: 1, rotate: 0, y: 0, duration: 0.8, ease: 'power2.out' } },
+                  { from: { y: '100%', opacity: 0, scale: 1, rotate: 0, x: 0 }, to: { y: 0, opacity: 1, scale: 1, rotate: 0, x: 0, duration: 0.8, ease: 'back.out(1.7)' } },
+                  { from: { y: '-100%', opacity: 0, scale: 1, rotate: 0, x: 0 }, to: { y: 0, opacity: 1, scale: 1, rotate: 0, x: 0, duration: 0.8, ease: 'back.out(1.7)' } },
+                  { from: { scale: 0, opacity: 0, rotate: -15, x: 0, y: 0 }, to: { scale: 1, opacity: 1, rotate: 0, x: 0, y: 0, duration: 0.8, ease: 'elastic.out(1, 0.75)' } },
+                  { from: { scale: 1.5, opacity: 0, rotate: 15, x: 0, y: 0 }, to: { scale: 1, opacity: 1, rotate: 0, x: 0, y: 0, duration: 0.8, ease: 'power3.out' } },
+                  { from: { rotateX: 90, opacity: 0, x: 0, y: 0, scale: 1 }, to: { rotateX: 0, opacity: 1, x: 0, y: 0, scale: 1, duration: 1, ease: 'expo.out' } },
+                  { from: { rotateY: 90, opacity: 0, x: 0, y: 0, scale: 0.5 }, to: { rotateY: 0, opacity: 1, x: 0, y: 0, scale: 1, duration: 0.8, ease: 'power4.out' } },
+                  { from: { skewX: 30, opacity: 0, x: 50 }, to: { skewX: 0, opacity: 1, x: 0, duration: 0.6, ease: 'power2.out' } }
+                ];
+                const selectedEntry = entryStyles[Math.floor(Math.random() * entryStyles.length)];
+                gsap.fromTo(adRef.current, selectedEntry.from, selectedEntry.to);
+              }
+            });
+
+            // Schedule next ad with dynamic interval (8-16s)
+            const nextInterval = Math.floor(Math.random() * (16000 - 8000 + 1) + 8000);
+            timeoutRef.current = setTimeout(triggerEffect, nextInterval);
+          }, 1000); // 1s adfree gap
+        }
+      });
+
+      // Exit Animations (V3 Physics)
+      if (selectedEffect === 'liquid') {
+        tl.to(adRef.current, { 
+          skewX: 40, 
+          y: 100, 
+          opacity: 0, 
+          filter: 'blur(15px)', 
+          duration: 1.2, 
+          ease: 'power2.in' 
+        });
+      } else if (selectedEffect === 'steam') {
+        tl.to(adRef.current, { 
+          y: -100, 
+          opacity: 0, 
+          scale: 1.5, 
+          filter: 'blur(20px)',
+          duration: 1, 
+          ease: 'power1.in' 
+        });
+      } else if (selectedEffect === 'plasma') {
+        tl.to(adRef.current, { 
+          scale: 0, 
+          opacity: 0, 
+          filter: 'hue-rotate(180deg) brightness(2)',
+          duration: 0.6, 
+          ease: 'back.in(2)' 
+        });
+      } else if (selectedEffect === 'holo') {
+        tl.to(adRef.current, { 
+          rotateY: 360, 
+          rotateX: 45,
+          scale: 0, 
+          opacity: 0, 
+          duration: 1,
+          ease: 'power3.inOut'
+        });
+      } else if (selectedEffect === 'glitch') {
+        tl.to(adRef.current, { 
+          x: () => (Math.random() - 0.5) * 50,
+          y: () => (Math.random() - 0.5) * 20,
+          skewX: () => (Math.random() - 0.5) * 30,
+          opacity: 0,
+          duration: 0.4,
+          repeat: 3,
+          yoyo: true,
+          ease: 'none'
+        }).to(adRef.current, { opacity: 0, duration: 0.1 });
+      } else if (selectedEffect === 'vortex') {
+        tl.to(adRef.current, { 
+          rotate: 720,
+          scale: 0,
+          opacity: 0,
+          duration: 1.2,
+          ease: 'circ.in'
+        });
+        tl.to(containerRef.current, {
+          scale: 0.9,
+          duration: 0.6,
+          yoyo: true,
+          repeat: 1
+        }, 0);
+      } else if (selectedEffect === 'slideLeft') {
+        tl.to(adRef.current, { 
+          x: '-100%', 
+          opacity: 0, 
+          duration: 0.8, 
+          ease: 'power2.in' 
+        });
+      } else if (selectedEffect === 'portal') {
+        tl.to(adRef.current, {
+          scale: 0,
+          opacity: 0,
+          filter: 'brightness(5)',
+          duration: 0.6,
+          ease: 'power2.in'
+        });
+      } else {
+        tl.to(adRef.current, { 
+          scale: 0, 
+          rotate: -360, 
+          opacity: 0, 
+          duration: 0.8,
+          ease: 'power4.in'
+        });
+      }
+    }
+  }, [selectNextAd]);
 
   useEffect(() => {
-    // Random rotation between 8 to 14 seconds
-    const intervalTime = Math.floor(Math.random() * (14000 - 8000 + 1) + 8000);
-    
-    const timer = setInterval(() => {
-      const nextIndex = (currentIndex + 1) % ADS.length;
-      const nextAd = ADS[nextIndex];
-      const randomCopy = nextAd.copies[Math.floor(Math.random() * nextAd.copies.length)];
-      
-      setCurrentIndex(nextIndex);
-      setCurrentCopy(randomCopy);
-    }, intervalTime);
+    // Initial start
+    const initialInterval = Math.floor(Math.random() * (16000 - 8000 + 1) + 8000);
+    timeoutRef.current = setTimeout(triggerEffect, initialInterval);
 
-    return () => clearInterval(timer);
-  }, [currentIndex]);
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [triggerEffect]);
 
-  const currentAd = ADS[currentIndex];
+  // Steam Particle Effect
+  useEffect(() => {
+    if (effectType === 'steam' && canvasRef.current) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+
+      const particles: any[] = [];
+      for (let i = 0; i < 50; i++) {
+        particles.push({
+          x: Math.random() * canvas.width,
+          y: canvas.height,
+          vx: (Math.random() - 0.5) * 2,
+          vy: -Math.random() * 3 - 1,
+          size: Math.random() * 5 + 2,
+          alpha: 1
+        });
+      }
+
+      let animationFrame: number;
+      const render = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.alpha -= 0.01;
+          ctx.fillStyle = `rgba(200, 200, 255, ${p.alpha})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        animationFrame = requestAnimationFrame(render);
+      };
+      render();
+      return () => {
+        cancelAnimationFrame(animationFrame);
+        if (canvasRef.current) {
+          const ctx = canvasRef.current.getContext('2d');
+          if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        }
+      };
+    }
+  }, [effectType]);
 
   return (
-    <div className="relative w-full h-10 overflow-hidden bg-zinc-950 rounded-2xl mt-2 border border-zinc-800/50 shadow-inner flex items-center justify-center">
-      {/* Subtle background pattern */}
-      <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.1)_1px,transparent_1px)] bg-[size:4px_4px]" />
-      
-      <AnimatePresence mode="popLayout">
-        <motion.a
-          key={`${currentAd.id}-${currentCopy.description}`}
-          href={currentAd.link}
-          target="_blank"
-          rel="noopener noreferrer"
-          initial={{ x: '100%' }}
-          animate={{ x: 0 }}
-          exit={{ x: '-100%' }}
-          transition={{ duration: 1.5, ease: "easeInOut" }}
-          className="absolute inset-0 flex items-center justify-between px-5 w-full h-full group hover:bg-zinc-900/50 transition-colors z-10"
-        >
-          <div className="flex items-center gap-4 overflow-hidden">
-            <div className={`flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${currentAd.color} text-white shadow-lg shadow-black/50`}>
-              {currentAd.icon}
+    <div 
+      ref={containerRef}
+      className="relative w-full h-12 overflow-hidden bg-zinc-950 rounded-2xl mt-2 border border-zinc-800/50 shadow-inner flex items-center justify-center perspective-1000"
+    >
+      {/* Canvas for effects */}
+      <canvas 
+        ref={canvasRef} 
+        className="absolute inset-0 pointer-events-none z-20"
+      />
+
+      {/* SVG Filters for Plasma/Liquid */}
+      <svg className="hidden">
+        <defs>
+          <filter id="liquid-filter">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+            <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="liquid" />
+          </filter>
+          <filter id="plasma-filter">
+            <feTurbulence type="fractalNoise" baseFrequency="0.01" numOctaves="5" seed="2">
+              <animate attributeName="baseFrequency" from="0.01" to="0.02" dur="5s" repeatCount="indefinite" />
+            </feTurbulence>
+            <feDisplacementMap in="SourceGraphic" scale="20" />
+          </filter>
+        </defs>
+      </svg>
+
+      <AnimatePresence mode="wait">
+        {!isAdfree && (
+          <motion.a
+            key={currentAd.id}
+            ref={adRef}
+            href={currentAd.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              "absolute inset-0 flex items-center justify-between px-6 w-full h-full group transition-all z-10",
+              effectType === 'liquid' && "filter-liquid",
+              effectType === 'plasma' && "filter-plasma"
+            )}
+            whileHover={{ scale: 1.02, boxShadow: "0 0 25px rgba(99, 102, 241, 0.4)" }}
+          >
+            <div className="flex items-center gap-4 overflow-hidden">
+              <div className={cn(
+                "flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br text-white shadow-lg",
+                currentAd.color
+              )}>
+                {currentAd.icon}
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black text-white tracking-[0.2em] uppercase opacity-50">Sponsored</span>
+                  <span className="text-xs font-black text-white tracking-widest uppercase">{currentAd.title}</span>
+                </div>
+                <span className="text-[11px] text-zinc-400 font-medium truncate max-w-[200px] sm:max-w-md">
+                  {currentCopy.description}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-2.5 truncate">
-              <span className="text-xs font-black text-white tracking-widest uppercase drop-shadow-md">{currentAd.title}</span>
-              <span className="text-[11px] text-zinc-300 font-medium truncate hidden sm:inline-block drop-shadow-sm">— {currentCopy.description}</span>
+            
+            <div className="flex items-center gap-2 shrink-0 ml-4 bg-indigo-600/20 px-4 py-1.5 rounded-full backdrop-blur-md border border-indigo-500/30 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+              <span className="text-[10px] font-black text-indigo-400 group-hover:text-white uppercase tracking-widest">
+                {currentCopy.cta}
+              </span>
+              <ExternalLink className="w-3 h-3" />
             </div>
-          </div>
-          
-          <div className="flex items-center gap-2 shrink-0 ml-4 bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm border border-white/10 group-hover:bg-white/20 transition-all">
-            <span className={`text-[10px] font-bold text-white uppercase tracking-wider`}>
-              {currentCopy.cta}
-            </span>
-            <ExternalLink className="w-3 h-3 text-white/70 group-hover:text-white transition-colors" />
-          </div>
-        </motion.a>
+          </motion.a>
+        )}
       </AnimatePresence>
+
+      {isAdfree && effectType !== 'none' && (
+        <div className="absolute inset-0 flex items-center justify-center z-30">
+          {/* Transition text removed to avoid distracting viewers */}
+        </div>
+      )}
+
+      <style>{`
+        .perspective-1000 { perspective: 1000px; }
+        .filter-liquid { filter: url(#liquid-filter); }
+        .filter-plasma { filter: url(#plasma-filter); }
+        
+        @keyframes portal-ripple {
+          0% { transform: scale(0); opacity: 1; }
+          100% { transform: scale(4); opacity: 0; }
+        }
+        
+        .portal-effect::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, transparent 70%);
+          animation: portal-ripple 1s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
+}
+
+function BookOpen(props: any) {
+  return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>;
 }

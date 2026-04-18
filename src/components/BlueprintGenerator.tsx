@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Upload, Sparkles, Download, Loader2, Image as ImageIcon, Ruler, Box, Maximize2, FileDown, Layers, PlusCircle, FileText, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateImageFromPrompt, generateChatResponse } from '../services/aiService';
+import { upsertToVectorDb } from '../services/vectorService';
 import { FileData } from '../types';
 import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
@@ -24,6 +25,8 @@ export function BlueprintGenerator({ onAIAction, onSaveToLibrary }: BlueprintGen
   const [isZipping, setIsZipping] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<FileData | null>(null);
   const [description, setDescription] = useState('');
+  const [dimensions, setDimensions] = useState({ length: '', width: '', height: '', unit: 'm' });
+  const [scale, setScale] = useState('1:1');
   const [blueprints, setBlueprints] = useState<Blueprint[]>([]);
   const [style, setStyle] = useState<'bw' | 'color' | 'blue' | 'sketch'>('blue');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -58,21 +61,35 @@ export function BlueprintGenerator({ onAIAction, onSaveToLibrary }: BlueprintGen
     
     try {
       // Step 1: Analyze the input to get view descriptions
-      const analysisPrompt = `Analyze this ${uploadedImage ? 'image' : 'description'} for a ${description || 'design'}. 
-      Generate 6 precise image generation prompts for different blueprint views: Front, Back, Side, Top, Isometric, and Orthographic.
+      const dimensionString = dimensions.length ? `Dimensions: ${dimensions.length}${dimensions.unit} (L) x ${dimensions.width}${dimensions.unit} (W) x ${dimensions.height}${dimensions.unit} (H)` : '';
       
-      CRITICAL REQUIREMENTS for Blender 5.1.0+ Interoperability:
-      1. Each view must be PERFECTLY CENTERED and ORTHOGRAPHIC (flat, no perspective for Front/Back/Side/Top).
-      2. The SCALE must be EXACTLY CONSISTENT across all views. If the object is 2m wide in Front, it must be 2m wide in Top.
-      3. Place ACCURATE MEASUREMENTS as edge lengths (e.g., "2.5m", "150cm") directly on the drawing.
-      4. Use a clean, solid background (white for B&W/Color, deep blue for Blueprint).
-      5. The style must be ${
+      const analysisPrompt = `Analyze this ${uploadedImage ? 'image' : 'description'} for a ${description || 'design'}. 
+      ${dimensionString ? `The object has the following real-world dimensions: ${dimensionString}.` : 'Specific dimensions were not provided. You MUST INFER realistic, professional, and architecturally sound measurements based on the object\'s type, purpose, and standard ergonomic/structural requirements.'}
+      The requested drawing scale is ${scale}.
+      
+      Generate 8 precise image generation prompts for professional architectural blueprint views: 
+      1. Front View (Orthographic)
+      2. Back View (Orthographic)
+      3. Top View (Plan View, flat on ground, Orthographic)
+      4. Left Side View (Orthographic)
+      5. Right Side View (Orthographic)
+      6. Section View (Vertical cross-section showing internal structure, materials, and hidden details)
+      7. Auxiliary View (Projected view of the most complex inclined or non-parallel surface)
+      8. Isometric View (3D technical reference)
+      
+      CRITICAL ARCHITECTURAL STANDARDS for Blender 5.1.0+ Interoperability:
+      1. ORTHOGRAPHIC PRECISION: Front, Back, Top, and Side views MUST be perfectly flat with ZERO perspective distortion. Use a telephoto lens effect (long focal length) to ensure parallel lines stay parallel.
+      2. ALIGNMENT & CENTERING: The object must be perfectly centered in the frame. The "ground line" must be at the exact same vertical position in all elevation views (Front, Back, Sides).
+      3. CONSISTENT SCALE: The bounding box dimensions must be identical across all views. If the object is 2m tall in Front, it must be exactly the same pixel-height in Side and Back views.
+      4. DIMENSIONING: Use professional architectural dimensioning (ISO/ANSI standards). Include dimension lines, extension lines, and tick marks/arrows. Label primary dimensions (L, W, H) and critical internal offsets in ${dimensions.unit}.
+      5. SECTIONING: The Section View must show a "cut" through the object, revealing wall thickness, internal supports, and material hatching (e.g., diagonal lines for metal, stippling for concrete).
+      6. AUXILIARY PROJECTION: The Auxiliary view must show a true-shape projection of a surface that is not parallel to the primary planes.
+      7. VISUAL CLARITY: Use a clean, solid background. Style: ${
         style === 'bw' ? 'clean black and white technical line drawing, high contrast, no shading, professional CAD style' : 
         style === 'blue' ? 'classic architectural blueprint, white lines on deep blue background, traditional engineering style' : 
         style === 'sketch' ? 'hand-drawn architectural sketch, pencil on parchment, artistic concept style' :
         'detailed color technical render, clean lighting, clear materials, modern architectural visualization'
       }.
-      6. Ensure the object is isolated with no extraneous elements.
       
       Return the result as a JSON array of objects with "view" and "prompt" fields. Only return the JSON.`;
 
@@ -116,6 +133,16 @@ export function BlueprintGenerator({ onAIAction, onSaveToLibrary }: BlueprintGen
         toast.error('Failed to generate blueprints.');
       } else {
         toast.success(`Generated ${generatedBlueprints.length} blueprint views.`);
+        
+        // Index blueprints for semantic search
+        generatedBlueprints.forEach(bp => {
+          upsertToVectorDb(`bp-${Date.now()}-${bp.view}`, `${description} - ${bp.view} view`, {
+            type: 'blueprint',
+            view: bp.view,
+            originalDescription: description,
+            style
+          }).catch(err => console.warn('Failed to index blueprint:', err));
+        });
       }
     } catch (error) {
       console.error('Blueprint generation failed', error);
@@ -198,20 +225,25 @@ export function BlueprintGenerator({ onAIAction, onSaveToLibrary }: BlueprintGen
 
     setIsGeneratingGuide(true);
     try {
-      const guidePrompt = `Create a comprehensive, step-by-step tutorial for modeling the following design in Blender 5.1.0 or later using the provided blueprints.
+      const guidePrompt = `Create an expert-level, step-by-step tutorial for modeling this architectural design in Blender 5.1.0+ using the provided professional blueprints.
       Design Description: ${description || 'Custom Object'}
       Views available: ${blueprints.map(b => b.view).join(', ')}
       
-      The tutorial must include:
-      1. Setting up the workspace (Units, Grid scale).
-      2. Importing blueprints as Background Images/Reference Images (Shift + A -> Image -> Reference).
-      3. Aligning views (Front, Side, Top) to match dimensions.
-      4. Modeling techniques (Extrusion, Subdivision, Modifiers).
-      5. Essential Shortcut Keys for Blender 5.1.0+.
-      6. Tips for achieving accurate edge lengths as specified in the blueprints.
-      7. Animation basics for this specific model.
+      The tutorial must cover:
+      1. WORKSPACE SETUP: Setting Scene Units to ${dimensions.unit} and matching the Grid Scale to the blueprint scale (${scale}).
+      2. REFERENCE ALIGNMENT: 
+         - Importing Front, Side, and Top views as Reference Images (Shift+A).
+         - Setting "Opacity" to 0.5 and "Depth" to 'Front'.
+         - Using the 'Empty' properties to offset images so they intersect at the world origin (0,0,0).
+         - Ensuring the "Ground Line" in elevation views matches the XY plane.
+      3. ORTHOGRAPHIC MODELING: 
+         - Starting with a primitive that matches the bounding box dimensions (${dimensions.length}x${dimensions.width}x${dimensions.height} ${dimensions.unit}).
+         - Using 'Knife Tool' (K) and 'Loop Cut' (Ctrl+R) to match the Section View details.
+      4. AUXILIARY MODELING: Using a 'Custom Transform Orientation' to model features from the Auxiliary View.
+      5. ADVANCED TECHNIQUES: Boolean operations for internal cavities shown in the Section View, and Subdivision Surface modeling for organic forms.
+      6. SHADER SETUP: Basic PBR material setup to match the blueprint's intended materials.
       
-      Format the output as a structured tutorial with clear headings and bullet points.`;
+      Format the output as a structured technical guide with clear headings and professional terminology.`;
 
       const response = await generateChatResponse(
         [{ role: 'user', content: guidePrompt }],
@@ -334,13 +366,74 @@ export function BlueprintGenerator({ onAIAction, onSaveToLibrary }: BlueprintGen
               <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
 
               <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1 block">Length</label>
+                    <input 
+                      type="text"
+                      value={dimensions.length}
+                      onChange={(e) => setDimensions({...dimensions, length: e.target.value})}
+                      placeholder="e.g. 5"
+                      className="w-full bg-zinc-50 border border-zinc-100 rounded-xl p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1 block">Width</label>
+                    <input 
+                      type="text"
+                      value={dimensions.width}
+                      onChange={(e) => setDimensions({...dimensions, width: e.target.value})}
+                      placeholder="e.g. 3"
+                      className="w-full bg-zinc-50 border border-zinc-100 rounded-xl p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1 block">Height</label>
+                    <input 
+                      type="text"
+                      value={dimensions.height}
+                      onChange={(e) => setDimensions({...dimensions, height: e.target.value})}
+                      placeholder="e.g. 2.5"
+                      className="w-full bg-zinc-50 border border-zinc-100 rounded-xl p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1 block">Unit</label>
+                    <select 
+                      value={dimensions.unit}
+                      onChange={(e) => setDimensions({...dimensions, unit: e.target.value})}
+                      className="w-full bg-zinc-50 border border-zinc-100 rounded-xl p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    >
+                      <option value="m">Meters (m)</option>
+                      <option value="cm">Centimeters (cm)</option>
+                      <option value="mm">Millimeters (mm)</option>
+                      <option value="ft">Feet (ft)</option>
+                      <option value="in">Inches (in)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1 block">Scale</label>
+                    <select 
+                      value={scale}
+                      onChange={(e) => setScale(e.target.value)}
+                      className="w-full bg-zinc-50 border border-zinc-100 rounded-xl p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    >
+                      <option value="1:1">1:1 (Full Size)</option>
+                      <option value="1:10">1:10</option>
+                      <option value="1:20">1:20</option>
+                      <option value="1:50">1:50</option>
+                      <option value="1:100">1:100</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div>
-                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2 block">Description / Dimensions</label>
+                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2 block">Description / Context</label>
                   <textarea 
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="e.g. Kitchen layout 4x5m with island, modern cabinets..."
-                    className="w-full bg-zinc-50 border border-zinc-100 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-h-[100px] resize-none"
+                    placeholder="e.g. Modern minimalist coffee table with glass top..."
+                    className="w-full bg-zinc-50 border border-zinc-100 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-h-[80px] resize-none"
                   />
                 </div>
 

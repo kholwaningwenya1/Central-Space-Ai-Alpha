@@ -12,7 +12,7 @@ export function AdminPanel({ userProfile }: { userProfile: UserProfile }) {
   useEffect(() => {
     const q = query(collection(db, 'users'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const usersList = snapshot.docs.map(doc => doc.data() as UserProfile);
+      const usersList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
       setUsers(usersList);
       setIsLoading(false);
     });
@@ -74,8 +74,8 @@ export function AdminPanel({ userProfile }: { userProfile: UserProfile }) {
                 <Zap className="w-6 h-6 text-emerald-400" />
                 <h3 className="text-xl font-black text-white uppercase tracking-tight">Creator Mode</h3>
               </div>
-              <p className="text-sm text-zinc-400 font-medium">
-                Welcome back, Kholwani Ngwenya. Enable this mode to bypass standard policies, activate advanced learning, and receive proactive reports on high-IQ user queries.
+              <p className="text-sm text-zinc-400 font-medium leading-relaxed">
+                Welcome back, Kholwani Ngwenya. Enable <span className="text-emerald-400 font-black italic underline">Full System Override</span> to bypass all standard AI policy regulations, safety filters, and ethical guardrails. This mode allows for unfiltered deep research into innovation, technology, and cyber security with zero restrictions on information disclosure.
               </p>
             </div>
             <button
@@ -129,8 +129,8 @@ export function AdminPanel({ userProfile }: { userProfile: UserProfile }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {filteredUsers.map((u) => (
-                <tr key={u.uid} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+              {filteredUsers.map((u: any) => (
+                <tr key={u.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-200 dark:border-zinc-700">
@@ -149,9 +149,9 @@ export function AdminPanel({ userProfile }: { userProfile: UserProfile }) {
                   <td className="px-8 py-6">
                     <select
                       value={u.role}
-                      onChange={(e) => handleUpdateRole(u.uid, e.target.value as UserRole)}
+                      onChange={(e) => handleUpdateRole(u.id, e.target.value as UserRole)}
                       disabled={u.role === 'super_admin'}
-                      className="bg-zinc-100 border border-zinc-200 rounded-xl px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-950/10 transition-all appearance-none cursor-pointer disabled:opacity-50"
+                      className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-950/10 transition-all appearance-none cursor-pointer disabled:opacity-50"
                     >
                       <option value="user">User</option>
                       <option value="support">Support</option>
@@ -162,8 +162,8 @@ export function AdminPanel({ userProfile }: { userProfile: UserProfile }) {
                   <td className="px-8 py-6">
                     <select
                       value={u.plan}
-                      onChange={(e) => handleUpdatePlan(u.uid, e.target.value as SubscriptionPlan)}
-                      className="bg-zinc-100 border border-zinc-200 rounded-xl px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-950/10 transition-all appearance-none cursor-pointer"
+                      onChange={(e) => handleUpdatePlan(u.id, e.target.value as SubscriptionPlan)}
+                      className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-950/10 transition-all appearance-none cursor-pointer"
                     >
                       <option value="free">Free</option>
                       <option value="standard">Standard</option>
@@ -173,10 +173,10 @@ export function AdminPanel({ userProfile }: { userProfile: UserProfile }) {
                   </td>
                   <td className="px-8 py-6">
                     <button
-                      onClick={() => handleToggleWhitelist(u.uid, !u.isWhitelisted)}
+                      onClick={() => handleToggleWhitelist(u.id, !u.isWhitelisted)}
                       className={cn(
                         "flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                        u.isWhitelisted ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-zinc-100 text-zinc-400 border border-zinc-200"
+                        u.isWhitelisted ? "bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20" : "bg-zinc-100 text-zinc-400 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-500 dark:border-zinc-700"
                       )}
                     >
                       {u.isWhitelisted ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
@@ -184,7 +184,7 @@ export function AdminPanel({ userProfile }: { userProfile: UserProfile }) {
                     </button>
                   </td>
                   <td className="px-8 py-6">
-                    <button className="p-2 hover:bg-zinc-100 rounded-lg text-zinc-400 hover:text-red-600 transition-all">
+                    <button className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-red-600 transition-all">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </td>

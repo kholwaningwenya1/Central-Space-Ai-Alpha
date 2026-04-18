@@ -199,7 +199,7 @@ service cloud.firestore {
              data.title is string && data.title.size() <= 200 &&
              data.messages is list && data.messages.size() <= 1000 &&
              data.uid is string &&
-             data.mode in ['chat', 'canvas', 'library', 'settings', 'units', 'document', 'directory', 'bots', 'media', 'billing', 'admin', 'blueprint'] &&
+             data.mode in ['chat', 'search', 'canvas', 'library', 'settings', 'units', 'document', 'directory', 'bots', 'media', 'billing', 'admin', 'blueprint', 'read_it_for_me'] &&
              data.type in ['direct', 'group', 'channel', 'workspace'] &&
              data.members is list && data.members.size() <= 100 &&
              data.updatedAt is number &&

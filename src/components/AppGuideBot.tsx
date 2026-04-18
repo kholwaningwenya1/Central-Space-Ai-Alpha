@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageCircle, X, Send, Bot, User, Loader2 } from 'lucide-react';
 import { generateChatResponse } from '../services/aiService';
+import { TypingIndicator } from './TypingIndicator';
 
 export function AppGuideBot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -136,10 +137,7 @@ Be concise, helpful, and friendly. If the user asks you to perform a task, you c
                   <div className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center shrink-0">
                     <Bot className="w-4 h-4 text-white" />
                   </div>
-                  <div className="px-4 py-3 rounded-2xl bg-white border border-zinc-200 rounded-tl-sm shadow-sm flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" />
-                    <span className="text-xs text-zinc-500">Thinking...</span>
-                  </div>
+                  <TypingIndicator label="Guide is thinking" className="!gap-0" />
                 </div>
               )}
               <div ref={messagesEndRef} />

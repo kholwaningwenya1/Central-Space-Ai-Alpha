@@ -4,12 +4,14 @@ import { Bot, X, Mic, Send, Paperclip, Loader2, Maximize2, Minimize2, Settings }
 import { Message } from '../types';
 import { generateChatResponseStream } from '../services/aiService';
 import { toast } from 'sonner';
+import { TypingIndicator } from './TypingIndicator';
 
 interface OmniBotProps {
   onClose: () => void;
+  userProfile?: any;
 }
 
-export function OmniBot({ onClose }: OmniBotProps) {
+export function OmniBot({ onClose, userProfile }: OmniBotProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [mode, setMode] = useState<'ask_first' | 'ask_as_needed' | 'auto_decide'>('ask_as_needed');
@@ -53,6 +55,7 @@ export function OmniBot({ onClose }: OmniBotProps) {
         tone: 'Professional',
         voice: 'Second person',
         modelId: 'gpt-4o',
+        isSuperAdminModeActive: userProfile?.isSuperAdminModeActive,
         customSystemInstruction: `You are OmniBot, an advanced AI assistant integrated directly into this application. 
 Your capabilities include:
 1. Navigating the app and automating user desires.
@@ -92,14 +95,45 @@ Always be helpful, concise, and proactive. If a user asks you to perform an acti
   const toggleListen = () => {
     if (isListening) {
       setIsListening(false);
-      // Stop speech recognition (mock implementation for now)
+      // In a real implementation we would stop the recognition
+      if ((window as any).recognition) {
+        (window as any).recognition.stop();
+      }
     } else {
-      setIsListening(true);
-      toast.info('Listening... (Voice recognition simulated)');
-      setTimeout(() => {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        toast.error('Voice recognition is not supported in this browser.');
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        toast.info('Listening...');
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(transcript);
         setIsListening(false);
-        setInput('Can you help me format this document?');
-      }, 2000);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        toast.error('Voice recognition failed.');
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      (window as any).recognition = recognition;
+      recognition.start();
     }
   };
 
@@ -131,6 +165,11 @@ Always be helpful, concise, and proactive. If a user asks you to perform an acti
             <Bot className="w-5 h-5 text-white" />
           </div>
           <span className="font-semibold tracking-tight">OmniBot</span>
+          {userProfile?.isSuperAdminModeActive && (
+            <span className="px-2 py-0.5 bg-emerald-500 text-zinc-950 text-[8px] font-black uppercase tracking-widest rounded-md">
+              Creator
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1">
           {isOpen && (
@@ -190,12 +229,7 @@ Always be helpful, concise, and proactive. If a user asks you to perform an acti
                 </div>
               ))}
               {isLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-zinc-100 dark:bg-zinc-800 rounded-2xl px-4 py-2.5 flex items-center gap-2 transition-colors duration-300">
-                    <Loader2 className="w-4 h-4 animate-spin text-zinc-500 dark:text-zinc-400" />
-                    <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Thinking...</span>
-                  </div>
-                </div>
+                <TypingIndicator label="OmniBot is thinking" />
               )}
               <div ref={messagesEndRef} />
             </div>

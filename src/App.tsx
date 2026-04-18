@@ -10,6 +10,7 @@ import { Library } from './components/Library';
 import { Units } from './components/Units';
 import { DocumentEditor } from './components/DocumentEditor';
 import { Directory } from './components/Directory';
+import { SemanticSearch } from './components/SemanticSearch';
 import { BotPlatform } from './components/BotPlatform';
 import { MediaHub } from './components/MediaHub';
 import { Settings } from './components/Settings';
@@ -17,10 +18,12 @@ import { Billing } from './components/Billing';
 import { AdminPanel } from './components/AdminPanel';
 import { OmniBot } from './components/OmniBot';
 import { BlueprintGenerator } from './components/BlueprintGenerator';
+import { ReadItForMe } from './components/ReadItForMe';
 import { Message, Tone, Voice, WorkspaceSession, FileData, SessionMode, Bot, Presence, ConversationType, Reaction, Poll, DocumentVersion, DocumentTemplate, UserProfile, SubscriptionPlan, UserRole, ResultType, UserSettings } from './types';
 import { AppGuideBot } from './components/AppGuideBot';
 import { AdBanner } from './components/AdBanner';
 import { generateChatResponse, generateChatResponseStream, generateImageFromPrompt, generateVideoFromPrompt, transcribeAudio, translateText, findYouTubeLinks, generateSpeech } from './services/aiService';
+import { upsertToVectorDb } from './services/vectorService';
 import { MobileLogin } from './components/MobileLogin';
 import { useSocket } from './contexts/SocketContext';
 import { Send, Loader2, PlusCircle, Trash2, Paperclip, X, Download, Mic, LogIn, LogOut, AlertCircle, MicOff, Search, FileText, FileSpreadsheet, Shield, Sparkles, Bot as BotIcon, Users, Smile, Image as ImageIcon, Folder, Menu } from 'lucide-react';
@@ -34,6 +37,7 @@ import {
 import { AIModel } from './types';
 import { cn, playNotificationSound } from './lib/utils';
 import { checkUsageLimit, incrementUsage } from './lib/usage';
+import { trackQuery } from './lib/adTracking';
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
 
@@ -266,7 +270,9 @@ export default function App() {
       });
 
       socket.on('presence-update', (users: any[]) => {
-        setRoomUsers(users);
+        // Deduplicate users by uid to prevent UI key duplication errors
+        const uniqueUsers = Array.from(new Map(users.map(u => [u.uid, u])).values());
+        setRoomUsers(uniqueUsers);
       });
 
       return () => {
@@ -1117,14 +1123,25 @@ export default function App() {
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64 = event.target?.result as string;
-        setPendingFiles(prev => [...prev, {
+        const newFile = {
           id: Math.random().toString(36).substring(2, 11),
           name: file.name,
           type: file.type,
           data: base64,
           size: file.size,
           timestamp: Date.now()
-        }]);
+        };
+        setPendingFiles(prev => [...prev, newFile]);
+
+        // Index all files for semantic search
+        const fileDescription = `File: ${file.name} (${file.type}). Uploaded on ${new Date().toLocaleDateString()}.`;
+        upsertToVectorDb(`file-${newFile.id}`, fileDescription, {
+          type: 'document',
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          timestamp: newFile.timestamp
+        }).catch(err => console.warn('Failed to index file:', err));
       };
       reader.readAsDataURL(file);
     });
@@ -1350,6 +1367,8 @@ export default function App() {
       timestamp: Date.now(),
       files: pendingFiles,
     };
+
+    trackQuery(input);
 
     const updatedMessages = [...(currentSession?.messages || []), userMessage];
     
@@ -2021,7 +2040,7 @@ export default function App() {
                     placeholder="Search workspaces, messages, and files..."
                     value={globalSearchQuery}
                     onChange={(e) => setGlobalSearchQuery(e.target.value)}
-                    className="flex-1 bg-transparent border-none text-lg text-zinc-900 focus:outline-none placeholder:text-zinc-300 font-medium"
+                    className="flex-1 bg-transparent border-none text-lg text-zinc-900 dark:text-zinc-100 focus:outline-none placeholder:text-zinc-300 dark:placeholder:text-zinc-600 font-medium"
                   />
                   <div className="flex items-center gap-2">
                     <span className="px-2 py-1 bg-zinc-100 rounded-md text-[10px] font-bold text-zinc-400 uppercase tracking-widest">ESC</span>
@@ -2112,7 +2131,7 @@ export default function App() {
           userProfile={userProfile}
         />
 
-        <main className="flex-1 flex flex-col relative w-full min-w-0">
+        <main className="flex-1 flex flex-col relative w-full min-w-0 bg-white dark:bg-zinc-950 transition-colors duration-300">
           {/* Header */}
           <header className="h-14 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 md:px-6 shrink-0 z-10 transition-colors duration-300">
             <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
@@ -2127,6 +2146,14 @@ export default function App() {
               <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate max-w-[120px] md:max-w-[200px]">
                 {currentSession?.title || 'No Workspace Selected'}
               </h2>
+              {userProfile?.isSuperAdminModeActive && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20 dark:border-emerald-500/30 rounded-full animate-pulse shadow-[0_0_15px_rgba(16,185,129,0.2)] backdrop-blur-md">
+                  <Shield className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest whitespace-nowrap drop-shadow-sm">
+                    Creator Mode
+                  </span>
+                </div>
+              )}
               <div className="h-4 w-px bg-zinc-200" />
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Mode:</span>
@@ -2138,7 +2165,7 @@ export default function App() {
                 <>
                   <div className="h-4 w-px bg-zinc-200" />
                   <div className="flex -space-x-2 overflow-hidden">
-                    {roomUsers.map((u) => (
+                    {Array.from(new Map(roomUsers.map(u => [u.uid, u])).values()).map((u) => (
                       <div 
                         key={u.uid}
                         className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-zinc-100 flex items-center justify-center overflow-hidden"
@@ -2442,6 +2469,8 @@ export default function App() {
                   updateSession(currentSessionId, { files: newFiles });
                 }}
               />
+            ) : currentSession?.mode === 'read_it_for_me' ? (
+              <ReadItForMe />
             ) : currentSession?.mode === 'library' ? (
               <Library 
                 files={currentSession.files || []} 
@@ -2470,6 +2499,10 @@ export default function App() {
                 activeBotsInSession={currentSession?.agentUnits || []}
                 userProfile={userProfile}
               />
+            ) : currentSession?.mode === 'search' ? (
+              <div className="flex-1 overflow-hidden p-6 bg-zinc-50 dark:bg-zinc-950">
+                <SemanticSearch />
+              </div>
             ) : currentSession?.mode === 'settings' ? (
               <Settings 
                 user={user} 
@@ -2505,7 +2538,7 @@ export default function App() {
               <div 
                 ref={scrollRef}
                 onScroll={handleScroll}
-                className="flex-1 overflow-y-auto scroll-smooth"
+                className="flex-1 overflow-y-auto scroll-smooth bg-white dark:bg-zinc-950 transition-colors duration-300"
               >
             {!currentSession || currentSession.messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center p-12 text-center max-w-2xl mx-auto font-sans">
@@ -2516,12 +2549,12 @@ export default function App() {
               >
                 <img src="/logo.png" alt="Central Space Logo" className="w-full h-full object-cover animate-pulse" />
               </motion.div>
-              <h1 className="text-4xl font-bold text-zinc-950 mb-6 tracking-tight font-display">
-                {currentSession ? "Start Your Workspace" : "Welcome to Central Space"}
+              <h1 className="text-4xl font-bold text-zinc-950 dark:text-zinc-50 mb-6 tracking-tight font-display transition-colors">
+                {currentSession ? "Chat & Research" : "Welcome to Central Space"}
               </h1>
-              <p className="text-zinc-500 mb-12 text-lg leading-relaxed font-medium">
+              <p className="text-zinc-500 dark:text-zinc-400 mb-12 text-lg leading-relaxed font-medium transition-colors">
                 {currentSession 
-                  ? "Type your first request below to begin your research or project."
+                  ? "Collaborate with AI, upload files, and research the web in one workspace."
                   : "Create a new workspace to start your research, document creation, or coding project."
                 }
               </p>
@@ -2696,7 +2729,7 @@ export default function App() {
     </div>
 
     {/* Input Area */}
-        <div className="p-6 bg-white/80 backdrop-blur-xl border-t border-zinc-200 shrink-0 relative">
+        <div className="p-6 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-t border-zinc-200 dark:border-zinc-800 shrink-0 relative transition-colors duration-300">
           <div className="max-w-5xl mx-auto space-y-4">
             {/* Smart Suggestions */}
             <AnimatePresence>
@@ -2836,8 +2869,11 @@ export default function App() {
                 disabled={!currentSession}
                 placeholder={currentSession ? "Ask anything... (Shift+Enter for new line)" : "Create a workspace to start"}
                 className={cn(
-                  "w-full bg-white border border-zinc-100 rounded-[2rem] px-6 md:px-8 py-4 md:py-6 text-sm md:text-base focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:border-zinc-950/20 resize-none min-h-[60px] md:min-h-[80px] max-h-[300px] disabled:opacity-50 shadow-2xl shadow-zinc-950/5 transition-all font-medium placeholder:text-zinc-300",
-                  isMobileView ? "pr-14" : "pr-56"
+                  "w-full bg-white dark:bg-zinc-800 border-2 rounded-[2rem] px-6 md:px-8 py-4 md:py-6 text-sm md:text-base resize-none min-h-[60px] md:min-h-[80px] max-h-[400px] disabled:opacity-50 shadow-2xl transition-all font-medium",
+                  userProfile?.isSuperAdminModeActive 
+                    ? "border-emerald-500/40 ring-8 ring-emerald-500/5 text-emerald-950 dark:text-emerald-50 placeholder:text-emerald-400/50 dark:placeholder:text-emerald-800/70 selection:bg-emerald-200 dark:selection:bg-emerald-800/40 shadow-[0_0_30px_rgba(16,185,129,0.1)]" 
+                    : "border-zinc-100 dark:border-zinc-700 text-zinc-950 dark:text-zinc-50 placeholder:text-zinc-300 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-4 focus:ring-zinc-950/5 focus:border-zinc-950/20 shadow-zinc-950/5",
+                  isMobileView ? "pr-44" : "pr-56"
                 )}
                 rows={1}
               />
@@ -2845,109 +2881,115 @@ export default function App() {
                 "absolute flex items-center gap-2",
                 isMobileView ? "right-3 bottom-3" : "right-4 bottom-4"
               )}>
-                {!isMobileView && (
-                  <div className="flex items-center gap-1 bg-zinc-50 p-1.5 rounded-2xl border border-zinc-100">
-                    <button
-                      type="button"
-                      onClick={() => currentSessionId && updateSession(currentSessionId, { searchEnabled: !currentSession?.searchEnabled })}
-                      className={cn(
-                        "p-2.5 rounded-xl transition-all",
-                        currentSession?.searchEnabled ? "bg-amber-100 text-amber-600 shadow-sm" : "text-zinc-400 hover:text-zinc-950 hover:bg-white"
-                      )}
-                      title="Web Search"
-                    >
-                      <Search className="w-5 h-5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={isRecording ? stopRecording : startRecording}
-                      className={cn(
-                        "p-2.5 rounded-xl transition-all",
-                        isRecording ? "bg-red-100 text-red-600 animate-pulse shadow-sm" : "text-zinc-400 hover:text-zinc-950 hover:bg-white"
-                      )}
-                      title={isRecording ? "Stop Recording" : "Voice Note"}
-                    >
-                      {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                    </button>
-                    <input 
-                      type="file" 
-                      ref={fileInputRef} 
-                      onChange={handleFileUpload} 
-                      className="hidden" 
-                      multiple
-                    />
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
-                        disabled={!currentSession || isLoading}
-                        className="p-2.5 text-zinc-400 hover:text-zinc-950 transition-all rounded-xl hover:bg-white disabled:opacity-50"
-                        title="Add Emoji"
-                      >
-                        <Smile className="w-5 h-5" />
-                      </button>
-                      <AnimatePresence>
-                        {isEmojiPickerOpen && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            className="absolute bottom-full right-0 mb-2 z-50"
-                          >
-                            <EmojiPicker
-                              onEmojiClick={(emojiData) => {
-                                setInput(prev => prev + emojiData.emoji);
-                                setIsEmojiPickerOpen(false);
-                              }}
-                            />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
+                <div className="flex items-center gap-1 bg-zinc-50 dark:bg-zinc-800 p-1.5 rounded-2xl border border-zinc-100 dark:border-zinc-700">
+                  <button
+                    type="button"
+                    onClick={() => currentSessionId && updateSession(currentSessionId, { searchEnabled: !currentSession?.searchEnabled })}
+                    className={cn(
+                      "p-2.5 rounded-xl transition-all",
+                      currentSession?.searchEnabled ? "bg-amber-100 text-amber-600 shadow-sm" : "text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-50 hover:bg-white dark:hover:bg-zinc-700"
+                    )}
+                    title="Web Search"
+                  >
+                    <Search className={cn(isMobileView ? "w-4 h-4" : "w-5 h-5")} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={isRecording ? stopRecording : startRecording}
+                    className={cn(
+                      "p-2.5 rounded-xl transition-all",
+                      isRecording ? "bg-red-100 text-red-600 animate-pulse shadow-sm" : "text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-50 hover:bg-white dark:hover:bg-zinc-700"
+                    )}
+                    title={isRecording ? "Stop Recording" : "Voice Note"}
+                  >
+                    {isRecording ? <MicOff className={cn(isMobileView ? "w-4 h-4" : "w-5 h-5")} /> : <Mic className={cn(isMobileView ? "w-4 h-4" : "w-5 h-5")} />}
+                  </button>
+                  
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileUpload} 
+                    className="hidden" 
+                    multiple
+                  />
 
-                    <div className="relative">
-                      <button
-                        onClick={() => setIsAttachmentMenuOpen(!isAttachmentMenuOpen)}
-                        disabled={!currentSession || isLoading}
-                        className="p-2.5 text-zinc-400 hover:text-zinc-950 transition-all rounded-xl hover:bg-white disabled:opacity-50"
-                        title="Attach Files"
-                      >
-                        <Paperclip className="w-5 h-5" />
-                      </button>
-                      <AnimatePresence>
-                        {isAttachmentMenuOpen && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            className="absolute bottom-full right-0 mb-2 w-48 bg-white rounded-2xl shadow-xl border border-zinc-100 overflow-hidden z-50"
-                          >
-                            <button
-                              onClick={() => {
-                                setIsAttachmentMenuOpen(false);
-                                fileInputRef.current?.click();
-                              }}
-                              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950 transition-colors text-left"
-                            >
-                              <ImageIcon className="w-4 h-4" />
-                              From Computer
-                            </button>
-                            <button
-                              onClick={() => {
-                                setIsAttachmentMenuOpen(false);
-                                setIsLibraryModalOpen(true);
-                              }}
-                              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950 transition-colors text-left border-t border-zinc-100"
-                            >
-                              <Folder className="w-4 h-4" />
-                              From Library
-                            </button>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
+                      disabled={!currentSession || isLoading}
+                      className="p-2.5 text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-50 transition-all rounded-xl hover:bg-white dark:hover:bg-zinc-700 disabled:opacity-50"
+                      title="Add Emoji"
+                    >
+                      <Smile className={cn(isMobileView ? "w-4 h-4" : "w-5 h-5")} />
+                    </button>
+                    <AnimatePresence>
+                      {isEmojiPickerOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                          className={cn(
+                             "absolute bottom-full mb-2 z-50",
+                             isMobileView ? "right-[-12px]" : "right-0"
+                          )}
+                        >
+                          <EmojiPicker
+                            onEmojiClick={(emojiData) => {
+                              setInput(prev => prev + emojiData.emoji);
+                              setIsEmojiPickerOpen(false);
+                            }}
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                )}
+
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsAttachmentMenuOpen(!isAttachmentMenuOpen)}
+                      disabled={!currentSession || isLoading}
+                      className="p-2.5 text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-50 transition-all rounded-xl hover:bg-white dark:hover:bg-zinc-700 disabled:opacity-50"
+                      title="Attach Files"
+                    >
+                      <Paperclip className={cn(isMobileView ? "w-4 h-4" : "w-5 h-5")} />
+                    </button>
+                    <AnimatePresence>
+                      {isAttachmentMenuOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                          className={cn(
+                            "absolute bottom-full mb-2 w-48 bg-white dark:bg-zinc-800 rounded-2xl shadow-xl border border-zinc-100 dark:border-zinc-700 overflow-hidden z-50",
+                            isMobileView ? "right-[-40px]" : "right-0"
+                          )}
+                        >
+                          <button
+                            onClick={() => {
+                              setIsAttachmentMenuOpen(false);
+                              fileInputRef.current?.click();
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 hover:text-zinc-950 dark:hover:text-zinc-50 transition-colors text-left"
+                          >
+                            <ImageIcon className="w-4 h-4" />
+                            From Computer
+                          </button>
+                          <button
+                            onClick={() => {
+                              setIsAttachmentMenuOpen(false);
+                              setIsLibraryModalOpen(true);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 hover:text-zinc-950 dark:hover:text-zinc-50 transition-colors text-left border-t border-zinc-100 dark:border-zinc-700"
+                          >
+                            <Folder className="w-4 h-4" />
+                            From Library
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
                 <button
                   onClick={handleSend}
                   disabled={(!input.trim() && pendingFiles.length === 0) || isLoading || !currentSession}
@@ -3018,7 +3060,10 @@ export default function App() {
       </AnimatePresence>
       
       {userSettings.omniBotEnabled && (
-        <OmniBot onClose={() => setUserSettings(prev => ({ ...prev, omniBotEnabled: false }))} />
+        <OmniBot 
+          userProfile={userProfile}
+          onClose={() => setUserSettings(prev => ({ ...prev, omniBotEnabled: false }))} 
+        />
       )}
       
       <Toaster position="top-right" />

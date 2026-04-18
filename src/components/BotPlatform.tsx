@@ -35,6 +35,7 @@ import { db, collection, onSnapshot, query, where, doc, setDoc, deleteDoc } from
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { generateChatResponseStream } from '../services/aiService';
+import { TypingIndicator } from './TypingIndicator';
 import Editor from 'react-simple-code-editor';
 import prism from 'prismjs';
 import 'prismjs/components/prism-clike';
@@ -1418,11 +1419,7 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
                               msg.role === 'user' ? "bg-zinc-950 text-white rounded-tr-none" : "bg-white text-zinc-900 border border-zinc-100 rounded-tl-none"
                             )}>
                               {msg.content || (isTestLoading && msg.role === 'assistant' ? (
-                                <div className="flex gap-1 py-1">
-                                  <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1.5 h-1.5 bg-zinc-400 rounded-full" />
-                                  <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1.5 h-1.5 bg-zinc-400 rounded-full" />
-                                  <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1.5 h-1.5 bg-zinc-400 rounded-full" />
-                                </div>
+                                <TypingIndicator label="Bot is thinking..." className="!gap-0 !p-0 border-none bg-transparent dark:bg-transparent shadow-none" />
                               ) : '')}
                             </div>
                           </div>
@@ -1439,7 +1436,7 @@ export function BotPlatform({ currentUserId, onToggleBotInSession, activeBotsInS
                         value={testInput}
                         onChange={(e) => setTestInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleTestBot()}
-                        className="w-full bg-zinc-50 border border-zinc-100 rounded-2xl py-5 pl-5 pr-14 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-950/10 transition-all shadow-inner"
+                        className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-2xl py-5 pl-5 pr-14 text-sm text-zinc-950 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-950/10 transition-all shadow-inner placeholder:text-zinc-300 dark:placeholder:text-zinc-500"
                       />
                       <button
                         onClick={handleTestBot}

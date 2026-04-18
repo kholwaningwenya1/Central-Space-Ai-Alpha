@@ -4,6 +4,7 @@ import { db, doc, onSnapshot } from '../firebase';
 import { generateChatResponseStream } from '../services/aiService';
 import { Send, Loader2, Bot as BotIcon } from 'lucide-react';
 import { motion } from 'motion/react';
+import { TypingIndicator } from './TypingIndicator';
 
 export function StandaloneBot({ botId }: { botId: string }) {
   const [bot, setBot] = useState<Bot | null>(null);
@@ -104,21 +105,7 @@ export function StandaloneBot({ botId }: { botId: string }) {
           </div>
         ))}
         {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-zinc-100 rounded-2xl px-5 py-4 flex items-center gap-3">
-              <div className="flex gap-1">
-                {[0, 1, 2].map((i) => (
-                  <motion.div
-                    key={i}
-                    animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }}
-                    transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                    className="w-2 h-2 rounded-full bg-zinc-400"
-                  />
-                ))}
-              </div>
-              <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Thinking</span>
-            </div>
-          </div>
+          <TypingIndicator label={`${bot.name} is thinking`} />
         )}
       </div>
 
