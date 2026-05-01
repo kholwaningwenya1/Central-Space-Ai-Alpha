@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { Message, Bot, WorkspaceSession, UserProfile, FileData, UserSettings } from '../types';
-import { generateChatResponseStream, generateSpeech, generateImageFromPrompt, findYouTubeLinks } from '../services/aiService';
+import { generateChatResponseStream, generateSpeech, generateImageFromPrompt, findYouTubeLinks, generateText } from '../services/aiService';
 import { db, updateDoc, doc, getDoc } from '../firebase';
 import { toast } from 'sonner';
 import { trackQuery } from '../lib/adTracking';
@@ -27,23 +27,17 @@ export const useChat = (
   const generateSmartSuggestions = async (lastAssistantMessage: string) => {
     if (!lastAssistantMessage) return [];
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [{ role: 'user', content: `Based on the following AI response, suggest 3 short, relevant follow-up questions or actions the user might want to take. Return ONLY a JSON array of strings.\n\nAI Response: "${lastAssistantMessage}"` }],
-          settings: { modelId: 'gpt-4o-mini', customSystemInstruction: "You are a helpful assistant that returns ONLY a JSON array of strings." },
-          modelId: 'gpt-4o-mini',
-          searchEnabled: false
-        })
-      });
-      if (!response.ok) throw new Error('Suggestions failed');
-      const data = await response.json();
-      let text = data.text || "[]";
-      if (text.includes('```')) {
-        text = text.replace(/```(?:json)?\n?([\s\S]*?)\n?```/g, '$1').trim();
+      const text = await generateText(
+        `Based on the following AI response, suggest 3 short, relevant follow-up questions or actions the user might want to take. Return ONLY a JSON array of strings.\n\nAI Response: "${lastAssistantMessage}"`,
+        'gpt-4o-mini',
+        "You are a helpful assistant that returns ONLY a JSON array of strings."
+      );
+
+      let cleanText = text || "[]";
+      if (cleanText.includes('```')) {
+        cleanText = cleanText.replace(/```(?:json)?\n?([\s\S]*?)\n?```/g, '$1').trim();
       }
-      const suggestions = JSON.parse(text);
+      const suggestions = JSON.parse(cleanText);
       return Array.isArray(suggestions) ? suggestions.slice(0, 3) : [];
     } catch (error) {
       console.error("Error generating suggestions:", error);

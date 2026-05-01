@@ -39,13 +39,31 @@ export const useAppLogic = () => {
       setUser(authUser);
       if (authUser) {
         // Fetch or create profile
-        const profileRef = doc(db, 'users', authUser.uid);
-        const profileSnap = await getDoc(profileRef);
-        
-        if (profileSnap.exists()) {
-          setUserProfile(profileSnap.data() as UserProfile);
-        } else {
-          const newProfile: UserProfile = {
+        try {
+          const profileRef = doc(db, 'users', authUser.uid);
+          const profileSnap = await getDoc(profileRef);
+          
+          if (profileSnap.exists()) {
+            setUserProfile(profileSnap.data() as UserProfile);
+          } else {
+            const newProfile: UserProfile = {
+              uid: authUser.uid,
+              email: authUser.email || '',
+              displayName: authUser.displayName || 'Anonymous',
+              photoURL: authUser.photoURL,
+              role: authUser.email === 'kholwaningwenya1@gmail.com' ? 'super_admin' : 'user',
+              plan: 'free',
+              isWhitelisted: true,
+              createdAt: Date.now(),
+              updatedAt: Date.now()
+            };
+            await setDoc(profileRef, newProfile);
+            setUserProfile(newProfile);
+          }
+        } catch (error) {
+          console.error("Failed to fetch user profile:", error);
+          // Fallback profile if offline
+          setUserProfile({
             uid: authUser.uid,
             email: authUser.email || '',
             displayName: authUser.displayName || 'Anonymous',
@@ -55,14 +73,14 @@ export const useAppLogic = () => {
             isWhitelisted: true,
             createdAt: Date.now(),
             updatedAt: Date.now()
-          };
-          await setDoc(profileRef, newProfile);
-          setUserProfile(newProfile);
+          });
+        } finally {
+          setIsAuthReady(true);
         }
       } else {
         setUserProfile(null);
+        setIsAuthReady(true);
       }
-      setIsAuthReady(true);
     });
     return () => unsubscribe();
   }, []);

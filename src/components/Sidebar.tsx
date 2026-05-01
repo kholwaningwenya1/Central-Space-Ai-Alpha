@@ -68,6 +68,7 @@ const MODELS: { id: AIModel; name: string; provider: string; description: string
 ];
 
 import { toast } from 'sonner';
+import { generateText } from '../services/aiService';
 
 export function Sidebar({ 
   currentTone, 
@@ -140,19 +141,12 @@ export function Sidebar({
     
     try {
       const history = currentSession.messages.map(m => `${m.role}: ${m.content}`).join('\n');
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [{ role: 'user', content: `Summarize this workspace session in 3-5 bullet points focusing on key decisions and actions:\n\n${history}` }],
-          settings: { modelId: 'gpt-4o-mini', customSystemInstruction: "You are a helpful assistant that provides concise summaries." },
-          modelId: 'gpt-4o-mini',
-          searchEnabled: false
-        })
-      });
-      if (!response.ok) throw new Error('Summary failed');
-      const data = await response.json();
-      setSummary(data.text || "Could not generate summary.");
+      const text = await generateText(
+        `Summarize this workspace session in 3-5 bullet points focusing on key decisions and actions:\n\n${history}`,
+        'gpt-4o-mini',
+        "You are a helpful assistant that provides concise summaries."
+      );
+      setSummary(text || "Could not generate summary.");
     } catch (error) {
       console.error("Summary failed:", error);
       setSummary("Failed to generate summary. Please try again.");
