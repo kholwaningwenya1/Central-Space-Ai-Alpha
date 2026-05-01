@@ -202,7 +202,7 @@ service cloud.firestore {
              (!('description' in data) || data.description is string) &&
              (!('startTime' in data) || data.startTime is string) &&
              (!('endTime' in data) || data.endTime is string) &&
-             (!('relatedSessionId' in data) || data.relatedSessionId is string);
+             (!('relatedSessionId' in data) || data.relatedSessionId == null || data.relatedSessionId is string);
     }
 
     function isValidSession(data) {
@@ -211,7 +211,7 @@ service cloud.firestore {
              data.title is string && data.title.size() <= 200 &&
              data.messages is list && data.messages.size() <= 1000 &&
              data.uid is string &&
-             data.mode in ['chat', 'search', 'canvas', 'library', 'settings', 'units', 'document', 'directory', 'bots', 'media', 'billing', 'admin', 'blueprint', 'read_it_for_me'] &&
+             data.mode in ['chat', 'search', 'canvas', 'library', 'settings', 'units', 'document', 'directory', 'bots', 'media', 'billing', 'admin', 'blueprint', 'read_it_for_me', 'calendar'] &&
              data.type in ['direct', 'group', 'channel', 'workspace'] &&
              data.members is list && data.members.size() <= 100 &&
              data.updatedAt is number &&

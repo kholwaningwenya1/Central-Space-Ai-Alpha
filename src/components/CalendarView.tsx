@@ -26,6 +26,7 @@ import {
 } from 'date-fns';
 import { CalendarEvent, WorkspaceSession } from '../types';
 import { db, collection, query, onSnapshot, addDoc, deleteDoc, doc } from '../firebase';
+import { cn } from '../lib/utils';
 
 interface CalendarViewProps {
   currentUserId: string;

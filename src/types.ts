@@ -4,7 +4,9 @@ export type AIModel =
   | 'gpt-4o'
   | 'gpt-4o-mini'
   | 'claude-3-5-sonnet'
-  | 'claude-3-opus';
+  | 'claude-3-opus'
+  | 'gemini-3-flash-preview'
+  | 'gemini-2.5-flash';
 
 export type SessionMode = 'chat' | 'search' | 'canvas' | 'library' | 'settings' | 'units' | 'document' | 'directory' | 'bots' | 'media' | 'billing' | 'admin' | 'blueprint' | 'read_it_for_me' | 'calendar';
 export type ConversationType = 'direct' | 'group' | 'channel' | 'workspace';
