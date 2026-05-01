@@ -21,6 +21,8 @@ import { TRENDING_QUERIES } from '../constants';
 import { cn } from '../lib/utils';
 import { AdBanner } from './AdBanner';
 
+import { CalendarView } from './CalendarView';
+
 interface MainViewProps {
   currentSession: WorkspaceSession | null;
   currentSessionId: string | null;
@@ -28,6 +30,7 @@ interface MainViewProps {
   userProfile: UserProfile | null;
   roomUsers: any[];
   templates: DocumentTemplate[];
+  sessions: WorkspaceSession[];
   userSettings: UserSettings;
   isLoading: boolean;
   isGeneratingImage: boolean;
@@ -92,7 +95,7 @@ interface MainViewProps {
 
 export const MainView: React.FC<MainViewProps> = (props) => {
   const {
-    currentSession, currentSessionId, user, userProfile, roomUsers, templates, userSettings,
+    currentSession, currentSessionId, user, userProfile, roomUsers, templates, sessions, userSettings,
     isLoading, isGeneratingImage, isGeneratingVideo, isMobileView, input, smartSuggestions,
     showCommandSuggestions, filteredCommands, pendingFiles, isEmojiPickerOpen,
     isAttachmentMenuOpen, isRecording, scrollRef, fileInputRef,
@@ -230,6 +233,8 @@ export const MainView: React.FC<MainViewProps> = (props) => {
             activeBotsInSession={currentSession?.agentUnits || []}
             userProfile={userProfile}
           />
+        ) : currentSession?.mode === 'calendar' ? (
+          <CalendarView currentUserId={user?.uid || ''} sessions={sessions} />
         ) : currentSession?.mode === 'admin' ? (
           <div className="flex-1 overflow-y-auto p-6 md:p-12 bg-zinc-50">
             <AdminPanel userProfile={userProfile!} />

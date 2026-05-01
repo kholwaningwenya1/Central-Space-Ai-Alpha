@@ -6,7 +6,7 @@ export type AIModel =
   | 'claude-3-5-sonnet'
   | 'claude-3-opus';
 
-export type SessionMode = 'chat' | 'search' | 'canvas' | 'library' | 'settings' | 'units' | 'document' | 'directory' | 'bots' | 'media' | 'billing' | 'admin' | 'blueprint' | 'read_it_for_me';
+export type SessionMode = 'chat' | 'search' | 'canvas' | 'library' | 'settings' | 'units' | 'document' | 'directory' | 'bots' | 'media' | 'billing' | 'admin' | 'blueprint' | 'read_it_for_me' | 'calendar';
 export type ConversationType = 'direct' | 'group' | 'channel' | 'workspace';
 
 export type UserRole = 'super_admin' | 'admin' | 'support' | 'user';
@@ -152,6 +152,18 @@ export interface DocumentTemplate {
 }
 
 export type ResultType = 'Text' | 'Image Sketches' | 'Audio' | 'Combination';
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description?: string;
+  date: string; // YYYY-MM-DD
+  startTime?: string; // HH:mm
+  endTime?: string; // HH:mm
+  type: 'meeting' | 'deadline' | 'task' | 'general';
+  createdBy: string;
+  relatedSessionId?: string;
+}
 
 export interface WorkspaceSession {
   id: string;

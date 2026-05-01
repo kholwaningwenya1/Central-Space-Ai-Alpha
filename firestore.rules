@@ -193,6 +193,18 @@ service cloud.firestore {
              (!('description' in data) || data.description is string);
     }
 
+    function isValidCalendarEvent(data) {
+      return data.keys().hasAll(['title', 'date', 'type', 'createdBy']) &&
+             data.title is string && data.title.size() <= 200 &&
+             data.date is string && data.date.size() <= 50 &&
+             data.type in ['meeting', 'deadline', 'task', 'general'] &&
+             data.createdBy is string &&
+             (!('description' in data) || data.description is string) &&
+             (!('startTime' in data) || data.startTime is string) &&
+             (!('endTime' in data) || data.endTime is string) &&
+             (!('relatedSessionId' in data) || data.relatedSessionId is string);
+    }
+
     function isValidSession(data) {
       return data.keys().hasAll(['id', 'title', 'messages', 'uid', 'mode', 'updatedAt', 'members', 'type']) &&
              data.id is string &&
@@ -287,6 +299,13 @@ service cloud.firestore {
       allow create: if isAuthenticated() && request.resource.data.creatorId == request.auth.uid && isValidTemplate(request.resource.data);
       allow update: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || isAdmin()) && isValidTemplate(request.resource.data);
       allow delete: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || isAdmin());
+    }
+
+    match /calendar_events/{eventId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid && isValidCalendarEvent(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.createdBy == request.auth.uid || isAdmin()) && isValidCalendarEvent(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.createdBy == request.auth.uid || isAdmin());
     }
 
     match /test/connection {

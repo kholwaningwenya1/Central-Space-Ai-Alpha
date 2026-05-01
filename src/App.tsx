@@ -240,6 +240,7 @@ export default function App() {
           userProfile={userProfile}
           roomUsers={Object.values(currentSession?.presence || {})}
           templates={[]} 
+          sessions={sessions}
           userSettings={userSettings}
           isLoading={isLoading}
           isGeneratingImage={isGeneratingImage}

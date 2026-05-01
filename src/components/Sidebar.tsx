@@ -27,7 +27,8 @@ import {
   Bot as BotIcon,
   CreditCard,
   Ruler,
-  BookOpen
+  BookOpen,
+  Calendar
 } from 'lucide-react';
 import { Tone, Voice, AIModel, WorkspaceSession, SessionMode, Presence, ConversationType, ResultType } from '../types';
 import { cn } from '../lib/utils';
@@ -235,6 +236,7 @@ export function Sidebar({
             { id: 'search', icon: SearchIcon, label: 'Semantic Search' },
             { id: 'media', icon: Sparkles, label: 'Media Hub' },
             { id: 'directory', icon: UserPlus, label: 'Directory' },
+            { id: 'calendar', icon: Calendar, label: 'Calendar' },
             { id: 'bots', icon: BotIcon, label: 'Bot Platform' },
             { id: 'read_it_for_me', icon: BookOpen, label: 'Read It For Me' },
             { id: 'document', icon: FileText, label: 'Document Editor' },
