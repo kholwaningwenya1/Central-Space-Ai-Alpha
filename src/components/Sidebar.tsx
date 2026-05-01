@@ -249,6 +249,7 @@ export function Sidebar({
             { id: 'library', icon: LibraryIcon, label: 'File Library' },
             { id: 'settings', icon: Settings, label: 'Settings' },
             { id: 'billing', icon: CreditCard, label: 'Billing & Plans' },
+            ...(userProfile?.role === 'super_admin' || userProfile?.role === 'admin' || userProfile?.email === 'kholwaningwenya1@gmail.com' ? [{ id: 'admin', icon: Shield, label: 'Admin Control' }] : []),
           ].map((mode) => (
             <button
               key={mode.id}

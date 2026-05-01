@@ -247,7 +247,8 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isAuthenticated() && (isOwner(userId) || isSupport());
+      allow get: if isAuthenticated() && (isOwner(userId) || isSupport());
+      allow list: if isAuthenticated();
       allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && 
                       ((isSuperAdmin() && request.resource.data.role == 'super_admin') || 
                        (!isSuperAdmin() && request.resource.data.role == 'user')) &&
